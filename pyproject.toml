@@ -1,0 +1,67 @@
+[project]
+name = "northstar-ai-operations-copilot"
+version = "0.1.0"
+description = "Enterprise AI operations copilot: advanced RAG, LangGraph agents, MCP tools and human approval on AWS Bedrock."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+# Dependencies are added incrementally with `uv add`, each in the commit that first uses it.
+dependencies = [
+    "fastapi>=0.162",
+    "pydantic>=2.14",
+    "pydantic-settings>=2.16",
+    "structlog>=26.1",
+    "uvicorn[standard]>=0.54",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.16",
+    "mypy>=2.4",
+    "pytest>=9.2",
+    "pytest-asyncio>=1.4.1.post1",
+    "ruff>=0.17",
+]
+
+[tool.uv]
+# Application, not a library: dependencies are installed, the project itself is not packaged.
+package = false
+
+# ---------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "B",        # bugbear
+    "UP",       # pyupgrade
+    "S",        # bandit (security)
+    "SIM",      # simplify
+    "RUF",      # ruff-specific
+    "ASYNC",    # async pitfalls (blocking calls in async code)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]  # assert is the point of a test
+
+# ---------------------------------------------------------------- mypy
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["app", "scripts"]
+plugins = ["pydantic.mypy"]
+
+# ---------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra --strict-markers"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = [
+    "integration: needs local Docker services (PostgreSQL, ElasticMQ); no AWS, no cost",
+    "aws: calls real AWS services and may incur cost; opt-in only, never in CI",
+]

@@ -1,0 +1,52 @@
+# Local development stack. Credentials below are local-only throwaway values.
+name: northstar-copilot
+
+x-app-service: &app-service
+  build:
+    context: .
+    target: dev
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    DATABASE_URL: postgresql+psycopg://northstar:northstar@db:5432/northstar
+    WATCHFILES_FORCE_POLLING: "true" # file events do not cross the Windows -> Linux VM boundary
+  volumes:
+    - ./:/app
+  depends_on:
+    db:
+      condition: service_healthy
+
+services:
+  db:
+    image: pgvector/pgvector:0.8.7-pg17
+    environment:
+      POSTGRES_USER: northstar
+      POSTGRES_PASSWORD: northstar
+      POSTGRES_DB: northstar
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U northstar -d northstar"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  sqs:
+    # SQS-compatible API: same boto3 code path locally and on AWS (only endpoint_url differs).
+    image: softwaremill/elasticmq-native:1.7.1
+    ports:
+      - "9324:9324" # SQS API
+      - "9325:9325" # stats UI
+    volumes:
+      - ./infra/elasticmq/elasticmq.conf:/opt/elasticmq.conf:ro
+
+  api:
+    <<: *app-service
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:
