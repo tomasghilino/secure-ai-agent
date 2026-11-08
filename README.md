@@ -20,13 +20,21 @@ through safe, predefined tools, and prepares sensitive actions for human approva
 
 ## Local quick start
 
-Prerequisites: Docker, [uv](https://docs.astral.sh/uv/), GNU Make.
+Prerequisites: Docker, [uv](https://docs.astral.sh/uv/), GNU Make. Optional: an NVIDIA
+GPU (≈ 8 GB VRAM) to run the local models.
 
 ```bash
-make setup    # Python 3.12 deps + .env (fake model providers: no AWS, no cost)
-make dev      # PostgreSQL+pgvector, ElasticMQ and the API on http://localhost:8000
-make check    # lint + type check + unit tests
+make setup     # Python 3.12 deps + .env (fake model providers: no AWS, no cost)
+make dev       # PostgreSQL+pgvector, ElasticMQ and the API on http://localhost:8000
+make check     # lint + type check + unit tests
+
+# Optional: real local models on the GPU (free), then set *_PROVIDER=ollama in .env
+make llm-pull  # starts Ollama and downloads qwen3:8b + qwen3-embedding:0.6b (~6 GB)
+make test-llm  # real-model tests
 ```
+
+Model providers are configuration: `fake` (tests/CI), `ollama` (local GPU) and `bedrock`
+(AWS staging). See [ADR-0005](docs/adr/0005-local-first-model-providers-with-ollama.md).
 
 `make help` lists every command.
 

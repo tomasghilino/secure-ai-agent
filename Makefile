@@ -3,7 +3,10 @@
 # Windows (cmd.exe). Run `make help` to list targets.
 
 .DEFAULT_GOAL := help
-.PHONY: help setup dev up down test lint format typecheck check
+.PHONY: help setup dev up down llm-up llm-pull test test-llm lint format typecheck check
+
+OLLAMA_CHAT_MODEL ?= qwen3:8b
+OLLAMA_EMBEDDING_MODEL ?= qwen3-embedding:0.6b
 
 help: ## List available commands
 	@uv run --no-project --quiet python scripts/make_help.py Makefile
@@ -18,11 +21,21 @@ dev: ## Run the full local stack (PostgreSQL+pgvector, ElasticMQ, API) with hot 
 up: ## Start only infrastructure services (db, sqs) in the background
 	docker compose up -d --wait db sqs
 
-down: ## Stop the local stack (data volumes are kept)
-	docker compose down
+down: ## Stop the local stack, including Ollama (data and model volumes are kept)
+	docker compose --profile llm down
+
+llm-up: ## Start local Ollama on the NVIDIA GPU (compose profile `llm`)
+	docker compose --profile llm up -d --wait ollama
+
+llm-pull: llm-up ## Download the local chat and embedding models (~6 GB, once)
+	docker compose exec ollama ollama pull $(OLLAMA_EMBEDDING_MODEL)
+	docker compose exec ollama ollama pull $(OLLAMA_CHAT_MODEL)
 
 test: ## Unit tests: no Docker, no AWS, no cost
 	uv run pytest tests/unit
+
+test-llm: ## Real-model tests against local Ollama (free; skipped if Ollama is down)
+	uv run pytest -m llm
 
 lint: ## Lint and verify formatting
 	uv run ruff check .

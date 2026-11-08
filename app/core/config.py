@@ -15,7 +15,10 @@ from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["local", "test", "staging"]
-Provider = Literal["fake", "bedrock"]
+# fake    -> deterministic, offline, free (unit tests, CI)
+# ollama  -> local open-weight models on the developer's GPU (free, private)
+# bedrock -> Amazon Bedrock (staging / benchmarks; costs money)
+Provider = Literal["fake", "ollama", "bedrock"]
 
 
 class Settings(BaseSettings):
@@ -35,16 +38,22 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://northstar:northstar@localhost:5432/northstar"
 
     # --- Model providers ---
-    # `fake` providers are deterministic and free: used by tests, CI and offline development.
     llm_provider: Provider = "fake"
     embedding_provider: Provider = "fake"
+    # Vector size stored in PostgreSQL. Changing it (or the embedding model) requires
+    # re-embedding every chunk: vectors from different models are not comparable.
+    embedding_dimensions: int = 1024
+
+    # --- Ollama (local models) ---
+    ollama_base_url: str = "http://localhost:11434"
+    ollama_chat_model: str = "qwen3:8b"
+    ollama_embedding_model: str = "qwen3-embedding:0.6b"
 
     # --- AWS / Bedrock (credentials come from the AWS SDK chain, never from this file) ---
     aws_region: str = "us-east-1"
     aws_profile: str | None = None
     bedrock_chat_model_id: str | None = None
     bedrock_embedding_model_id: str = "amazon.titan-embed-text-v2:0"
-    embedding_dimensions: int = 1024  # Titan V2 supports 256 | 512 | 1024
 
     # --- Cost guardrails ---
     llm_max_output_tokens: int = Field(default=800, ge=64, le=4096)
@@ -52,8 +61,9 @@ class Settings(BaseSettings):
     @field_validator("embedding_dimensions")
     @classmethod
     def _titan_v2_dimensions(cls, value: int) -> int:
+        # Sizes supported by both Titan V2 and Qwen3-Embedding (Matryoshka truncation).
         if value not in (256, 512, 1024):
-            raise ValueError("EMBEDDING_DIMENSIONS must be 256, 512 or 1024 (Titan V2)")
+            raise ValueError("EMBEDDING_DIMENSIONS must be 256, 512 or 1024")
         return value
 
     @model_validator(mode="after")

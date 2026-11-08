@@ -10,6 +10,7 @@ x-app-service: &app-service
       required: false
   environment:
     DATABASE_URL: postgresql+psycopg://northstar:northstar@db:5432/northstar
+    OLLAMA_BASE_URL: http://ollama:11434
     WATCHFILES_FORCE_POLLING: "true" # file events do not cross the Windows -> Linux VM boundary
   volumes:
     - ./:/app
@@ -43,6 +44,25 @@ services:
     volumes:
       - ./infra/elasticmq/elasticmq.conf:/opt/elasticmq.conf:ro
 
+  ollama:
+    # Local LLM + embedding runtime on the host's NVIDIA GPU. Opt-in profile so machines
+    # without a GPU can still run the stack with fake providers: `docker compose --profile llm up`.
+    image: ollama/ollama:0.40.14
+    profiles: ["llm"]
+    ports:
+      - "11434:11434"
+    environment:
+      OLLAMA_KEEP_ALIVE: "30m" # keep models in VRAM between requests (avoids reload latency)
+    volumes:
+      - ollama-models:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
   api:
     <<: *app-service
     ports:
@@ -50,3 +70,4 @@ services:
 
 volumes:
   pgdata:
+  ollama-models:

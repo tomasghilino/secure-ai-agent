@@ -7,6 +7,7 @@ requires-python = ">=3.12,<3.13"
 # Dependencies are added incrementally with `uv add`, each in the commit that first uses it.
 dependencies = [
     "fastapi>=0.162",
+    "ollama>=0.6",
     "pydantic>=2.14",
     "pydantic-settings>=2.16",
     "structlog>=26.1",
@@ -63,5 +64,6 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = [
     "integration: needs local Docker services (PostgreSQL, ElasticMQ); no AWS, no cost",
+    "llm: needs the local Ollama server (compose profile `llm`) with models pulled; free",
     "aws: calls real AWS services and may incur cost; opt-in only, never in CI",
 ]
