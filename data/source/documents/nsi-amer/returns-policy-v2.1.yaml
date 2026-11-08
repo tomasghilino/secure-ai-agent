@@ -1,0 +1,74 @@
+# Deliberately outdated revision: superseded by v3.0 on 2026-03-01. Its text does not say
+# it is superseded (it was the active policy when issued), so the system must rely on
+# document metadata (status, effective dates) rather than on the content.
+doc_id: NSI-POL-RET-003
+title: Returns and Refunds Policy
+version: "2.1"
+effective_date: 2024-02-01
+status: superseded
+supersedes: "2.0"
+tenant_id: nsi-amer
+department: Customer Operations
+doc_type: policy
+classification: internal
+owner: Director, Customer Operations
+approved_by: Chief Operating Officer
+next_review: 2025-02-01
+
+sections:
+  - heading: 1. Purpose and Scope
+    blocks:
+      - p: >-
+          This policy defines how Northstar Industrial Americas, Inc. ("Northstar") accepts
+          returns of equipment purchased by business customers and how refunds and restocking
+          fees are calculated. It applies to all orders invoiced in the United States, Canada
+          and Latin America.
+      - p: >-
+          Warranty claims for defective equipment are handled under the Product Warranty
+          Policy (NSI-POL-WAR-005).
+
+  - heading: 2. Return Eligibility
+    blocks:
+      - p: >-
+          A return request must be submitted within **45 calendar days of the delivery date**.
+          Returned equipment must be unused and in its original packaging, including manuals
+          and accessories.
+      - table:
+          columns: [Item type, Returnable, Conditions]
+          widths: [0.30, 0.15, 0.55]
+          rows:
+            - [Standard catalog equipment, "Yes", "Unused, original packaging, request within 45 days"]
+            - [Build-to-order items, "No", "Only returnable under the Product Warranty Policy"]
+            - [Opened consumables, "No", "Not returnable once opened"]
+
+  - heading: 3. Return Process
+    blocks:
+      - steps:
+          - The customer contacts their account manager with the original order number.
+          - Customer Operations issues an RMA number within 3 business days.
+          - The RMA is valid for **30 calendar days**.
+          - The customer ships the item to the warehouse indicated on the RMA.
+          - The warehouse inspects the item within 7 business days of receipt.
+          - Customer Operations issues the refund or credit note.
+
+  - heading: 4. Restocking Fees and Refunds
+    blocks:
+      - table:
+          columns: [Return reason, Restocking fee, Freight paid by]
+          widths: [0.45, 0.25, 0.30]
+          rows:
+            - [Non-defective return, 10%, Customer]
+            - [Incorrect item shipped by Northstar, 0%, Northstar]
+            - [Item damaged in transit (reported within 72 hours), 0%, Northstar]
+      - p: >-
+          Refunds are issued within **15 business days** after inspection. Refunds above
+          USD 25,000 require approval from the Finance department.
+
+  - heading: 5. Revision History
+    blocks:
+      - table:
+          columns: [Version, Effective date, Summary of changes]
+          widths: [0.15, 0.20, 0.65]
+          rows:
+            - ["2.1", 2024-02-01, "Clarified freight responsibility for transit damage."]
+            - ["2.0", 2023-01-15, "Policy restructured; credit notes introduced."]

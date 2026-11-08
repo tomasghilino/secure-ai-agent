@@ -1,0 +1,24 @@
+# Canonical facts about the fictional company. Every generated PDF and database row is
+# derived from files in data/source/, so expected answers for evaluation are known exactly.
+# All names, identifiers and figures are fictional.
+
+company:
+  name: Northstar Industrial
+  description: >-
+    Distributor of industrial pumps, air compressors, control valves and motion-control
+    equipment for manufacturing, food processing, marine and energy customers.
+
+tenants:
+  - id: nsi-amer
+    legal_name: Northstar Industrial Americas, Inc.
+    region: North and South America
+    currency: USD
+    page_size: letter
+  - id: nsi-emea
+    legal_name: Northstar Industrial EMEA B.V.
+    region: Europe, Middle East and Africa
+    currency: EUR
+    page_size: a4
+
+# Ordered from least to most sensitive. Retrieval filters on these levels per role.
+classifications: [public, internal, confidential, restricted]

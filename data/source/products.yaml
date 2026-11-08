@@ -1,0 +1,115 @@
+# Product master data (tenant nsi-amer). Single source of truth for the catalog PDF and
+# for the `products` table. Variant suffixes are deliberately similar (NX-4400 vs NX-4400B)
+# to test whether retrieval distinguishes look-alike products.
+#
+# Suffix legend: B = marine-grade, S = sanitary (316L stainless), V = variable-speed drive,
+#                E = electric actuator, X = absolute encoder.
+
+products:
+  - sku: NX-4400
+    name: Hydraulic Gear Pump
+    category: Hydraulic Pumps
+    specs: 45 L/min, 250 bar max, cast-iron housing, SAE flange
+    list_price_usd: 3850
+    warranty_months: 24
+    lead_time_days: 10
+    returnable: true
+
+  - sku: NX-4400B
+    name: Hydraulic Gear Pump, Marine-Grade
+    category: Hydraulic Pumps
+    specs: 45 L/min, 250 bar max, bronze housing, 316 stainless shaft, salt-spray tested
+    list_price_usd: 5420
+    warranty_months: 36
+    lead_time_days: 21
+    returnable: true
+
+  - sku: NX-6200
+    name: Axial Piston Pump, Build-to-Order
+    category: Hydraulic Pumps
+    specs: 80 L/min, 350 bar max, load-sensing control, configured per order
+    list_price_usd: 9900
+    warranty_months: 24
+    lead_time_days: 28
+    returnable: false
+
+  - sku: CP-150
+    name: End-Suction Centrifugal Pump
+    category: Centrifugal Pumps
+    specs: 150 m3/h, 45 m head, ductile-iron casing, 15 kW motor
+    list_price_usd: 4200
+    warranty_months: 18
+    lead_time_days: 12
+    returnable: true
+
+  - sku: CP-150S
+    name: End-Suction Centrifugal Pump, Sanitary
+    category: Centrifugal Pumps
+    specs: 150 m3/h, 45 m head, 316L stainless, 3-A sanitary certified
+    list_price_usd: 6750
+    warranty_months: 24
+    lead_time_days: 18
+    returnable: true
+
+  - sku: CP-300
+    name: Split-Case Centrifugal Pump
+    category: Centrifugal Pumps
+    specs: 300 m3/h, 60 m head, ductile-iron casing, 37 kW motor
+    list_price_usd: 7900
+    warranty_months: 18
+    lead_time_days: 20
+    returnable: true
+
+  - sku: AC-110
+    name: Rotary Screw Air Compressor
+    category: Air Compressors
+    specs: 11 kW, 1.8 m3/min at 8 bar, fixed speed, integrated dryer
+    list_price_usd: 11600
+    warranty_months: 24
+    lead_time_days: 15
+    returnable: true
+
+  - sku: AC-110V
+    name: Rotary Screw Air Compressor, Variable Speed
+    category: Air Compressors
+    specs: 11 kW, 0.6-2.0 m3/min at 8 bar, variable-speed drive, integrated dryer
+    list_price_usd: 14200
+    warranty_months: 36
+    lead_time_days: 15
+    returnable: true
+
+  - sku: CV-50
+    name: Pneumatic Globe Control Valve DN50
+    category: Control Valves
+    specs: DN50, PN40, pneumatic actuator, 4-20 mA positioner
+    list_price_usd: 1240
+    warranty_months: 12
+    lead_time_days: 7
+    returnable: true
+
+  - sku: CV-50E
+    name: Electric Globe Control Valve DN50
+    category: Control Valves
+    specs: DN50, PN40, electric actuator 24 VDC, Modbus RTU
+    list_price_usd: 2180
+    warranty_months: 24
+    lead_time_days: 9
+    returnable: true
+
+  - sku: SM-750
+    name: AC Servo Motor 750 W
+    category: Servo Motors
+    specs: 750 W, 2.39 Nm rated torque, 3000 rpm, incremental encoder
+    list_price_usd: 980
+    warranty_months: 24
+    lead_time_days: 5
+    returnable: true
+
+  - sku: SM-750X
+    name: AC Servo Motor 750 W, Absolute Encoder
+    category: Servo Motors
+    specs: 750 W, 2.39 Nm rated torque, 3000 rpm, 23-bit absolute encoder
+    list_price_usd: 1320
+    warranty_months: 24
+    lead_time_days: 5
+    returnable: true

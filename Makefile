@@ -3,7 +3,7 @@
 # Windows (cmd.exe). Run `make help` to list targets.
 
 .DEFAULT_GOAL := help
-.PHONY: help setup dev up down llm-up llm-pull test test-llm lint format typecheck check
+.PHONY: help setup data dev up down llm-up llm-pull test test-llm lint format typecheck check
 
 OLLAMA_CHAT_MODEL ?= qwen3:8b
 OLLAMA_EMBEDDING_MODEL ?= qwen3-embedding:0.6b
@@ -14,6 +14,9 @@ help: ## List available commands
 setup: ## Install Python 3.12 deps (all groups) and create .env if missing
 	uv sync --all-groups
 	uv run python scripts/setup_env.py
+
+data: ## Generate the synthetic PDFs + manifest from data/source (deterministic)
+	uv run python -m scripts.generate_pdfs
 
 dev: ## Run the full local stack (PostgreSQL+pgvector, ElasticMQ, API) with hot reload
 	docker compose up --build

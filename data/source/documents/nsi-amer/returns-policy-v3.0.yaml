@@ -1,0 +1,120 @@
+doc_id: NSI-POL-RET-003
+title: Returns and Refunds Policy
+version: "3.0"
+effective_date: 2026-03-01
+status: active
+supersedes: "2.1"
+tenant_id: nsi-amer
+department: Customer Operations
+doc_type: policy
+classification: internal
+owner: Director, Customer Operations
+approved_by: Chief Operating Officer
+next_review: 2027-03-01
+
+sections:
+  - heading: 1. Purpose and Scope
+    blocks:
+      - p: >-
+          This policy defines how Northstar Industrial Americas, Inc. ("Northstar") accepts
+          returns of equipment purchased by business customers and how refunds, credits and
+          restocking fees are calculated. It applies to all orders invoiced in the United
+          States, Canada and Latin America on or after the effective date of this version.
+      - p: >-
+          Warranty claims for defective equipment are governed by the Product Warranty Policy
+          (NSI-POL-WAR-005). Where a return is caused by a manufacturing defect confirmed by
+          Northstar Technical Services, the warranty process takes precedence over this policy.
+
+  - heading: 2. Definitions
+    blocks:
+      - table:
+          columns: [Term, Definition]
+          widths: [0.25, 0.75]
+          rows:
+            - [RMA, "Return Merchandise Authorization: the reference number issued by Customer Operations that must accompany every returned item."]
+            - [Delivery date, "The date recorded on the carrier's proof of delivery at the customer's ship-to address."]
+            - [Non-defective return, "A return of equipment that is in working condition, for example an incorrect item ordered by the customer or excess quantity."]
+            - [Build-to-order item, "Equipment configured or assembled to a customer's specification, such as the NX-6200 axial piston pump."]
+
+  - heading: 3. Return Eligibility
+    blocks:
+      - p: >-
+          A return request must be submitted within **30 calendar days of the delivery date**.
+          Requests received after 30 days are not accepted, except as described in Section 8.
+          Returned equipment must be unused, in its original packaging and accompanied by all
+          manuals, accessories and certificates supplied with it.
+      - table:
+          columns: [Item type, Returnable, Conditions]
+          widths: [0.30, 0.15, 0.55]
+          rows:
+            - [Standard catalog equipment, "Yes", "Unused, original packaging, request within 30 days"]
+            - [Marine-grade and sanitary variants, "Yes", "Same as standard; seals must be intact"]
+            - [Build-to-order items (e.g. NX-6200), "No", "Only returnable under the Product Warranty Policy"]
+            - [Opened consumables and seal kits, "No", "Not returnable once the package is opened"]
+            - [Items sold as clearance or final sale, "No", "Marked as final sale on the invoice"]
+
+  - heading: 4. Return Process
+    blocks:
+      - steps:
+          - The customer submits a return request through the customer portal or to their account manager, quoting the original order number.
+          - Customer Operations validates eligibility and issues an RMA number within 2 business days.
+          - The RMA is valid for **15 calendar days**. Items received after the RMA expires are returned to the customer at the customer's expense.
+          - The customer ships the item to the warehouse specified on the RMA. Return freight is paid by the customer unless the return is caused by a Northstar error.
+          - The receiving warehouse inspects the item within 5 business days of receipt and records the result against the RMA.
+          - Customer Operations issues the refund or credit note according to Section 5.
+
+  - heading: 5. Restocking Fees and Refunds
+    blocks:
+      - p: >-
+          Refunds are calculated on the invoiced price of the returned item, excluding freight
+          and taxes, minus the applicable restocking fee.
+      - table:
+          columns: [Return reason, Restocking fee, Freight paid by]
+          widths: [0.45, 0.25, 0.30]
+          rows:
+            - [Non-defective return (customer error or change of mind), 15%, Customer]
+            - [Incorrect item shipped by Northstar, 0%, Northstar]
+            - [Item damaged in transit (reported within 48 hours), 0%, Northstar]
+            - [Defect confirmed under warranty, 0%, Northstar]
+      - p: >-
+          Refunds are issued to the original payment method or as a credit note within
+          **10 business days** after the inspection is completed. Credit notes expire 12 months
+          after issue.
+
+  - heading: 6. Refund Approval Authority
+    blocks:
+      - table:
+          columns: [Refund amount (USD), Approval required]
+          widths: [0.35, 0.65]
+          rows:
+            - ["Up to 10,000", Customer Operations Supervisor]
+            - ["10,000.01 to 50,000", Director of Customer Operations]
+            - ["Above 50,000", Director of Customer Operations and Finance Controller]
+      - note: >-
+          Approvers may not approve refunds for orders they created or for customers they
+          manage as account owner. Such refunds are escalated to the next approval level.
+
+  - heading: 7. Non-Returnable Items
+    blocks:
+      - bullets:
+          - Build-to-order and custom-configured equipment, including the NX-6200 axial piston pump.
+          - Opened consumables, lubricants, filters and seal kits.
+          - Items marked as clearance or final sale on the invoice.
+          - Equipment that has been installed, operated or modified by the customer.
+
+  - heading: 8. Exceptions
+    blocks:
+      - p: >-
+          The Director of Customer Operations may approve a late return of up to 60 calendar
+          days after delivery for strategic accounts. Late returns carry a restocking fee of
+          25% and require a written justification attached to the RMA.
+
+  - heading: 9. Revision History
+    blocks:
+      - table:
+          columns: [Version, Effective date, Summary of changes]
+          widths: [0.15, 0.20, 0.65]
+          rows:
+            - ["3.0", 2026-03-01, "Return window reduced from 45 to 30 days; restocking fee for non-defective returns increased from 10% to 15%; RMA validity reduced to 15 days; refund approval matrix introduced."]
+            - ["2.1", 2024-02-01, "Clarified freight responsibility for transit damage."]
+            - ["2.0", 2023-01-15, "Policy restructured; credit notes introduced."]

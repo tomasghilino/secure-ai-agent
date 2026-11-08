@@ -1,0 +1,76 @@
+doc_id: NSI-CAT-PRD-001
+title: Industrial Equipment Product Catalog 2026
+version: "2026.2"
+effective_date: 2026-07-01
+status: active
+supersedes: "2026.1"
+tenant_id: nsi-amer
+department: Product Management
+doc_type: catalog
+classification: public
+owner: Head of Product Management
+approved_by: VP Sales
+next_review: 2027-01-01
+
+sections:
+  - heading: 1. About This Catalog
+    blocks:
+      - p: >-
+          This catalog lists the standard equipment distributed by Northstar Industrial
+          Americas, Inc. List prices are in US dollars, exclude freight and taxes, and are
+          valid for orders placed between July 1 and December 31, 2026. Customer-specific
+          contract prices override list prices.
+      - p: >-
+          Lead times are expressed in business days from order confirmation to shipment from
+          the regional warehouse. Build-to-order items are configured per order and are not
+          returnable under the Returns and Refunds Policy (NSI-POL-RET-003).
+
+  - heading: 2. Variant Suffixes
+    blocks:
+      - p: >-
+          Many products are offered in variants that share a base model number. Always quote
+          the complete SKU, including the suffix, when ordering or requesting support.
+      - table:
+          columns: [Suffix, Meaning, Example]
+          widths: [0.15, 0.55, 0.30]
+          rows:
+            - [B, "Marine-grade materials (bronze housing, stainless shaft), extended warranty", NX-4400B]
+            - [S, "Sanitary construction in 316L stainless steel for food and pharma", CP-150S]
+            - [V, "Variable-speed drive for energy savings at partial load", AC-110V]
+            - [E, "Electric actuator instead of pneumatic", CV-50E]
+            - [X, "Absolute encoder instead of incremental", SM-750X]
+
+  - heading: 3. Hydraulic Pumps
+    blocks:
+      - product_table: Hydraulic Pumps
+      - note: >-
+          The NX-4400 and NX-4400B have identical hydraulic performance. Specify the NX-4400B
+          for offshore, marine or washdown environments; it carries a 36-month warranty
+          instead of 24 months.
+
+  - heading: 4. Centrifugal Pumps
+    blocks:
+      - product_table: Centrifugal Pumps
+
+  - heading: 5. Air Compressors
+    blocks:
+      - product_table: Air Compressors
+      - note: >-
+          The AC-110V reduces energy consumption by up to 30% compared with the fixed-speed
+          AC-110 when air demand varies during the shift.
+
+  - heading: 6. Control Valves
+    blocks:
+      - product_table: Control Valves
+
+  - heading: 7. Servo Motors
+    blocks:
+      - product_table: Servo Motors
+
+  - heading: 8. Ordering and Support
+    blocks:
+      - bullets:
+          - Orders are placed through the customer portal or with your account manager.
+          - Technical questions are handled by Northstar Technical Services.
+          - Warranty periods listed in this catalog start on the delivery date.
+          - Support response times depend on the customer's support tier under the Customer Support SLA (NSI-SLA-CS-002).
