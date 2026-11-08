@@ -1,0 +1,97 @@
+doc_id: NSI-POL-WAR-005
+title: Product Warranty Policy
+version: "3.0"
+effective_date: 2025-06-01
+status: active
+supersedes: "2.4"
+tenant_id: nsi-amer
+department: Technical Services
+doc_type: policy
+classification: internal
+owner: Director, Technical Services
+approved_by: Chief Operating Officer
+next_review: 2026-12-01
+
+sections:
+  - heading: 1. Purpose and Scope
+    blocks:
+      - p: >-
+          This policy describes the warranty that Northstar Industrial Americas, Inc.
+          ("Northstar") provides on new equipment sold to business customers, what it covers,
+          how claims are submitted and how they are resolved.
+      - p: >-
+          Returns of non-defective equipment are governed by the Returns and Refunds Policy
+          (NSI-POL-RET-003). Response times for support requests are defined in the Customer
+          Support SLA (NSI-SLA-CS-002).
+
+  - heading: 2. Warranty Start and Periods
+    blocks:
+      - p: >-
+          The warranty period starts on the **delivery date** recorded on the carrier's proof
+          of delivery. Warranty periods depend on the product line and variant.
+      - table:
+          columns: [Product line, Standard period, Exceptions]
+          widths: [0.30, 0.20, 0.50]
+          rows:
+            - [Hydraulic pumps, 24 months, "NX-4400B marine-grade: 36 months"]
+            - [Centrifugal pumps, 18 months, "CP-150S sanitary: 24 months"]
+            - [Air compressors, 24 months, "AC-110V variable speed: 36 months"]
+            - [Control valves, 12 months, "CV-50E electric actuator: 24 months"]
+            - [Servo motors, 24 months, "None"]
+
+  - heading: 3. Coverage
+    blocks:
+      - p: >-
+          The warranty covers defects in **materials and workmanship** under normal use and
+          service in accordance with the product manual. Coverage applies to the original
+          purchaser and transfers with the equipment if it is resold within the warranty period.
+
+  - heading: 4. Exclusions
+    blocks:
+      - bullets:
+          - Wear parts, including seals, filters and belts.
+          - Damage caused by misuse, accident or neglect.
+          - Installation that does not follow the product manual.
+          - Operation outside the rated specifications (pressure, flow, temperature, voltage).
+          - Unauthorized modifications or repairs by third parties.
+          - Corrosion of non-marine variants used in marine or offshore environments.
+
+  - heading: 5. Claim Process
+    blocks:
+      - steps:
+          - The customer submits a claim through the customer portal **within 30 days of discovering the defect**.
+          - The claim includes the serial number, photos of the defect and the operating hours at the time of failure.
+          - Technical Services reviews the claim and may request the unit or a site inspection.
+          - Technical Services communicates its decision **within 5 business days** of receiving a complete claim.
+          - Approved claims are resolved by repair, replacement or credit, at Northstar's option.
+
+  - heading: 6. Remedies and Replacement Parts
+    blocks:
+      - p: >-
+          Repaired or replaced parts are warranted for the **remainder of the original
+          warranty period or 90 days, whichever is longer**. Replaced parts become the
+          property of Northstar.
+      - p: >-
+          **On-site field labor** is covered only during the **first 12 months** of the
+          warranty period. After 12 months, parts remain covered but field labor and travel are
+          invoiced at standard service rates.
+
+  - heading: 7. Extended Warranty
+    blocks:
+      - p: >-
+          Customers may purchase an extended warranty that adds **12 months** to the standard
+          period for **8% of the list price** of the equipment. The extended warranty can only
+          be purchased **at the time of the order** and cannot be added afterwards.
+      - note: >-
+          Warranty obligations for products sourced from OEM suppliers are backed by
+          pass-through warranties in the corresponding supplier agreements.
+
+  - heading: 8. Revision History
+    blocks:
+      - table:
+          columns: [Version, Effective date, Summary of changes]
+          widths: [0.15, 0.20, 0.65]
+          rows:
+            - ["3.0", 2025-06-01, "Warranty periods aligned with product variants; field labor coverage limited to the first 12 months; claim window set to 30 days."]
+            - ["2.4", 2024-03-01, "Extended warranty pricing updated to 8% of list price."]
+            - ["2.0", 2022-10-01, "Policy restructured by product line."]

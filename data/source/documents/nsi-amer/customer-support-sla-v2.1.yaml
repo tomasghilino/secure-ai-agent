@@ -1,0 +1,102 @@
+doc_id: NSI-SLA-CS-002
+title: Customer Support Service Level Agreement
+version: "2.1"
+effective_date: 2025-11-01
+status: active
+supersedes: "2.0"
+tenant_id: nsi-amer
+department: Technical Services
+doc_type: sla
+classification: internal
+owner: Director, Technical Services
+approved_by: Chief Operating Officer
+next_review: 2026-11-01
+
+sections:
+  - heading: 1. Purpose and Scope
+    blocks:
+      - p: >-
+          This Service Level Agreement (SLA) defines the response and resolution targets that
+          Northstar Technical Services commits to for support requests raised by customers of
+          Northstar Industrial Americas, Inc. It applies to all equipment supplied by Northstar
+          and covered by an active support tier.
+      - p: >-
+          Warranty decisions are governed by the Product Warranty Policy (NSI-POL-WAR-005);
+          this SLA covers only how quickly requests are handled.
+
+  - heading: 2. Support Tiers
+    blocks:
+      - table:
+          columns: [Tier, Description]
+          widths: [0.20, 0.80]
+          rows:
+            - [Standard, "Included with every equipment purchase. Business-hours support through the portal and email."]
+            - [Premium, "Paid annual contract with faster targets and access to phone support for P1 and P2."]
+            - [Platinum, "Paid annual contract for critical operations. 24x7 handling of P1 requests and service credits."]
+
+  - heading: 3. Priority Definitions
+    blocks:
+      - table:
+          columns: [Priority, Definition, Example]
+          widths: [0.12, 0.43, 0.45]
+          rows:
+            - [P1, Production down, "A compressor feeding a production line has stopped and no backup is available."]
+            - [P2, Degraded operation, "A pump runs at reduced flow or with abnormal vibration."]
+            - [P3, Minor issue, "A non-critical alarm or a cosmetic defect with no impact on output."]
+            - [P4, Question or request, "Documentation requests, spare-part questions or training."]
+
+  - heading: 4. Response and Resolution Targets
+    blocks:
+      - p: >-
+          First response means a qualified engineer has acknowledged the request and started
+          diagnosis. Target resolution means the equipment is restored to normal operation or a
+          workaround is in place.
+      - table:
+          columns: [Priority, Standard (response / resolution), Premium (response / resolution), Platinum (response / resolution)]
+          widths: [0.10, 0.30, 0.30, 0.30]
+          rows:
+            - [P1, "4 hours / 2 business days", "1 hour / 24 hours", "30 minutes / 8 hours (24x7)"]
+            - [P2, "8 business hours / 5 business days", "4 hours / 3 business days", "2 hours / 2 business days"]
+            - [P3, "2 business days / 10 business days", "1 business day / 7 business days", "8 business hours / 5 business days"]
+            - [P4, "3 business days / best effort", "2 business days / 10 business days", "1 business day / 7 business days"]
+
+  - heading: 5. Business Hours and Channels
+    blocks:
+      - p: >-
+          Business hours are **08:00 to 18:00 Eastern Time, Monday to Friday**, excluding
+          company holidays. Platinum P1 requests are handled **24x7**.
+      - table:
+          columns: [Channel, Availability]
+          widths: [0.25, 0.75]
+          rows:
+            - [Customer portal, "All tiers and priorities; preferred channel for P3 and P4."]
+            - [Email, "All tiers and priorities."]
+            - [Phone, "Only for P1 and P2 requests."]
+
+  - heading: 6. Escalation
+    blocks:
+      - steps:
+          - If a P1 first response target is missed, the request is escalated automatically to the Support Manager on duty.
+          - If the P1 request is still not acknowledged 2 hours after the escalation, it is escalated to the Director of Technical Services.
+          - Customers may request escalation of any open request through their account manager.
+
+  - heading: 7. Service Credits
+    blocks:
+      - p: >-
+          Service credits apply to the **Platinum tier only**. For each missed P1 first
+          response target, the customer receives a credit of **5% of the monthly support
+          fee**, up to a maximum of **20% per month**. Credits are applied to the next invoice
+          and are the customer's sole remedy for missed targets.
+      - note: >-
+          Targets do not apply while Northstar is waiting for information or site access from
+          the customer, or during force majeure events.
+
+  - heading: 8. Revision History
+    blocks:
+      - table:
+          columns: [Version, Effective date, Summary of changes]
+          widths: [0.15, 0.20, 0.65]
+          rows:
+            - ["2.1", 2025-11-01, "Platinum P1 resolution target reduced from 12 to 8 hours; phone channel limited to P1 and P2."]
+            - ["2.0", 2024-05-01, "Platinum tier and service credits introduced."]
+            - ["1.3", 2023-02-01, "Clarified business hours and holidays."]

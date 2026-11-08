@@ -1,0 +1,96 @@
+# Deliberately outdated revision: superseded by v4.0 on 2026-01-15. The text does not say
+# it is superseded; status and effective dates live in the document metadata.
+doc_id: NSI-POL-PRC-001
+title: Procurement and Purchasing Policy
+version: "3.2"
+effective_date: 2024-07-01
+status: superseded
+supersedes: "3.0"
+tenant_id: nsi-amer
+department: Procurement
+doc_type: policy
+classification: internal
+owner: Head of Procurement
+approved_by: Chief Financial Officer
+next_review: 2025-07-01
+
+sections:
+  - heading: 1. Purpose and Scope
+    blocks:
+      - p: >-
+          This policy establishes how Northstar Industrial Americas, Inc. ("Northstar")
+          purchases goods and services from third parties, ensuring that commitments are
+          properly authorized and that suppliers are selected fairly and transparently.
+      - p: >-
+          The policy applies to all employees and contractors who commit Northstar funds.
+          Business travel and related expenses are governed by the Employee Travel and Expense
+          Policy and are excluded from this policy.
+
+  - heading: 2. Definitions
+    blocks:
+      - table:
+          columns: [Term, Definition]
+          widths: [0.25, 0.75]
+          rows:
+            - [Purchase order (PO), "The formal document issued by Procurement that authorizes a supplier to deliver goods or services."]
+            - [Total purchase value, "The full value of the commitment over its term, including taxes, freight and recurring fees."]
+            - [Sole source, "A purchase awarded to a single supplier without competitive quotes."]
+
+  - heading: 3. Purchase Order Requirement
+    blocks:
+      - p: >-
+          A purchase order is required for every purchase with a total purchase value
+          **above USD 1,000**. Suppliers must not start work or ship goods before the PO has
+          been issued. Purchases up to USD 1,000 may be paid with a company purchasing card.
+
+  - heading: 4. Approval Authority
+    blocks:
+      - p: >-
+          Approval is based on the total purchase value and is recorded in the procurement
+          system before the purchase order is issued.
+      - table:
+          columns: [Total purchase value (USD), Approval required]
+          widths: [0.35, 0.65]
+          rows:
+            - ["Up to 10,000", Line manager]
+            - ["10,000.01 to 100,000", Department head]
+            - ["100,000.01 to 500,000", Chief Financial Officer]
+            - ["Above 500,000", Chief Executive Officer]
+
+  - heading: 5. Competitive Quotes
+    blocks:
+      - p: >-
+          At least **three written quotes** are required for every purchase above
+          USD 10,000. Quotes must be attached to the requisition. Sole-source purchases require
+          a written justification approved by the Procurement Manager.
+
+  - heading: 6. Supplier Onboarding
+    blocks:
+      - steps:
+          - The requester submits a new supplier request.
+          - Procurement performs sanctions screening.
+          - The supplier provides tax documentation and banking details.
+          - Procurement approves the supplier and adds it to the vendor master.
+
+  - heading: 7. Payment Terms
+    blocks:
+      - p: >-
+          Northstar's standard payment terms are **Net 30** days from receipt of a correct
+          invoice. Deviations from standard terms require approval from the Finance Controller.
+
+  - heading: 8. Prohibited Practices
+    blocks:
+      - bullets:
+          - Splitting a purchase to avoid an approval or quote threshold.
+          - Committing funds before the required approvals are obtained.
+          - Accepting gifts or hospitality from suppliers above the limits of the Code of Conduct.
+
+  - heading: 9. Revision History
+    blocks:
+      - table:
+          columns: [Version, Effective date, Summary of changes]
+          widths: [0.15, 0.20, 0.65]
+          rows:
+            - ["3.2", 2024-07-01, "Clarified purchasing card limits and supplier onboarding documents."]
+            - ["3.0", 2023-03-01, "Policy restructured; electronic requisitions introduced."]
+            - ["2.1", 2021-09-01, "Updated approval matrix for inflation."]

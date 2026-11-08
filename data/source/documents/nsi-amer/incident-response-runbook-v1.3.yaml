@@ -1,0 +1,95 @@
+doc_id: NSI-RBK-SEC-011
+title: Security Incident Response Runbook
+version: "1.3"
+effective_date: 2026-05-15
+status: active
+supersedes: "1.2"
+tenant_id: nsi-amer
+department: Information Security
+doc_type: runbook
+classification: confidential
+owner: Head of Information Security
+approved_by: Chief Information Officer
+next_review: 2026-11-15
+
+sections:
+  - heading: 1. Purpose
+    blocks:
+      - p: >-
+          This runbook tells responders exactly what to do when a security incident affects
+          Northstar Industrial Americas, Inc. systems, data or facilities. It complements the
+          Information Security Policy (NSI-POL-SEC-010), which requires every suspected
+          incident to be reported to Security Operations within 1 hour.
+
+  - heading: 2. Severity Levels
+    blocks:
+      - table:
+          columns: [Severity, Example, Acknowledgement target, Additional requirements]
+          widths: [0.12, 0.38, 0.20, 0.30]
+          rows:
+            - [SEV1, "Ransomware on production systems; confirmed exfiltration of customer data", 15 minutes, "Incident Commander assigned; executive notification within 1 hour"]
+            - [SEV2, "Compromised employee account with access to confidential data", 30 minutes, "Incident Commander assigned"]
+            - [SEV3, "Malware blocked on a single laptop; phishing campaign without clicks", 4 business hours, "Handled by Security Operations"]
+            - [SEV4, "Policy violation without data exposure", Next business day, "Tracked in the ticketing system"]
+
+  - heading: 3. Roles
+    blocks:
+      - table:
+          columns: [Role, Responsibilities]
+          widths: [0.25, 0.75]
+          rows:
+            - [Incident Commander, "Owns the response, sets priorities, approves containment actions and declares the incident closed."]
+            - [Communications Lead, "Prepares internal updates, customer notices and regulator communications with Legal."]
+            - [Scribe, "Keeps the timeline of events, decisions and evidence in the incident record."]
+            - [Subject-matter experts, "Engineers and system owners who investigate and execute technical actions."]
+
+  - heading: 4. Response Phases
+    blocks:
+      - steps:
+          - "**Detection**: an alert, report or anomaly is logged as a potential incident."
+          - "**Triage**: Security Operations confirms the incident and assigns a severity."
+          - "**Containment**: isolate affected hosts, disable compromised accounts and block malicious indicators."
+          - "**Eradication**: remove malware, close the exploited vulnerability and rotate credentials."
+          - "**Recovery**: restore services from known-good backups and monitor for recurrence."
+          - "**Post-incident review**: completed within 5 business days for SEV1 and SEV2 incidents."
+
+  - heading: 5. Evidence Preservation
+    blocks:
+      - bullets:
+          - Do not power off affected systems; disconnect them from the network instead.
+          - Capture volatile memory and system logs before making changes.
+          - Record every action with timestamp and operator in the incident record.
+          - Store evidence in the restricted evidence repository with chain-of-custody notes.
+
+  - heading: 6. Personal Data Breaches
+    blocks:
+      - p: >-
+          If personal data may have been exposed, **Legal and the Data Protection Officer**
+          must be notified **within 24 hours** of confirmation. Where required by law,
+          regulators are notified **within 72 hours**. Customers are notified according to
+          their contractual obligations.
+      - note: >-
+          Only the Communications Lead, with approval from Legal, may communicate with
+          customers, regulators or the media about an incident.
+
+  - heading: 7. Contacts
+    blocks:
+      - table:
+          columns: [Function, Contact]
+          widths: [0.45, 0.55]
+          rows:
+            - [Security Operations (24x7), "ext. 4100 / on-call pager"]
+            - [Head of Information Security, ext. 4101]
+            - [Legal, ext. 4300]
+            - [Data Protection Officer, ext. 4310]
+            - [IT Infrastructure on-call, ext. 4200]
+
+  - heading: 8. Revision History
+    blocks:
+      - table:
+          columns: [Version, Effective date, Summary of changes]
+          widths: [0.15, 0.20, 0.65]
+          rows:
+            - ["1.3", 2026-05-15, "SEV1 acknowledgement target reduced to 15 minutes; evidence preservation steps expanded."]
+            - ["1.2", 2025-08-01, "Added Data Protection Officer notification within 24 hours."]
+            - ["1.0", 2024-11-01, "Initial runbook."]

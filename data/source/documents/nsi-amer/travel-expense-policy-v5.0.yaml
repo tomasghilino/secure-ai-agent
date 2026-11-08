@@ -1,0 +1,101 @@
+doc_id: NSI-POL-TRV-007
+title: Employee Travel and Expense Policy
+version: "5.0"
+effective_date: 2026-04-01
+status: active
+supersedes: "4.3"
+tenant_id: nsi-amer
+department: Finance
+doc_type: policy
+classification: internal
+owner: Finance Controller
+approved_by: Chief Financial Officer
+next_review: 2027-04-01
+
+sections:
+  - heading: 1. Purpose and Scope
+    blocks:
+      - p: >-
+          This policy defines how employees of Northstar Industrial Americas, Inc. plan,
+          book and claim business travel and related expenses. It aims to keep employees safe
+          and comfortable while controlling costs and ensuring that every reimbursement is
+          documented and compliant.
+      - p: >-
+          The policy applies to all employees and contractors traveling on Northstar business.
+          Purchases of goods and services for the company are governed by the Procurement and
+          Purchasing Policy (NSI-POL-PRC-001).
+
+  - heading: 2. Pre-Approval
+    blocks:
+      - p: >-
+          Written pre-approval from the employee's line manager is required for all
+          **international travel** and for any trip with an estimated total cost **above
+          USD 2,500**. The request states the business purpose, dates and estimated costs.
+
+  - heading: 3. Air Travel
+    blocks:
+      - table:
+          columns: [Flight duration, Permitted class]
+          widths: [0.35, 0.65]
+          rows:
+            - [Under 6 hours, Economy]
+            - [6 hours or more, Premium economy]
+            - [Any duration, "Business class only with VP approval"]
+      - p: >-
+          Flights must be booked through the corporate travel agency at least 14 days in
+          advance when possible. Change fees caused by personal reasons are not reimbursed.
+
+  - heading: 4. Lodging
+    blocks:
+      - p: >-
+          Hotel costs are reimbursed up to the following **nightly caps**, excluding taxes.
+          Exceptions require approval from the Finance Controller.
+      - table:
+          columns: [Location, Nightly cap (USD)]
+          widths: [0.65, 0.35]
+          rows:
+            - ["New York, San Francisco, Toronto and Sao Paulo", "325"]
+            - [Other cities in the United States and Canada, "210"]
+            - [Other cities in Latin America, "180"]
+
+  - heading: 5. Meals and Per Diem
+    blocks:
+      - p: >-
+          Meals are covered by a daily per diem of **USD 75 per day for domestic travel** and
+          **USD 90 per day for international travel**. Alcohol is not reimbursable, except as
+          part of approved client entertainment.
+
+  - heading: 6. Ground Transportation
+    blocks:
+      - bullets:
+          - Use of a personal vehicle is reimbursed at **USD 0.67 per mile**.
+          - Rental cars must be compact or intermediate class unless three or more employees travel together.
+          - Taxis and ride-hailing services are reimbursed when public transport is impractical.
+
+  - heading: 7. Receipts and Expense Reports
+    blocks:
+      - steps:
+          - Keep an itemized receipt for **any expense above USD 25**.
+          - Submit the expense report in the expense system **within 30 days after the trip ends**.
+          - The line manager reviews and approves the report.
+          - Finance audits the report and reimburses approved amounts with the next payroll.
+      - note: >-
+          Expense reports submitted **more than 90 days** after the trip ends are not
+          reimbursed.
+
+  - heading: 8. Corporate Card
+    blocks:
+      - p: >-
+          The corporate card is **mandatory for employees who travel more than 4 times per
+          year**. Personal charges on the corporate card are prohibited and must be repaid
+          within 30 days.
+
+  - heading: 9. Revision History
+    blocks:
+      - table:
+          columns: [Version, Effective date, Summary of changes]
+          widths: [0.15, 0.20, 0.65]
+          rows:
+            - ["5.0", 2026-04-01, "Hotel caps updated; premium economy allowed for flights of 6 hours or more; receipt threshold lowered to USD 25."]
+            - ["4.3", 2025-01-01, "Mileage rate updated."]
+            - ["4.0", 2023-06-01, "Corporate card made mandatory for frequent travelers."]

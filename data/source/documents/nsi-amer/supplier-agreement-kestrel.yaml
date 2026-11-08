@@ -1,0 +1,119 @@
+doc_id: NSI-AGR-SUP-014
+title: Supplier Management Agreement - Kestrel Fluid Systems Ltd.
+version: "1.0"
+effective_date: 2025-09-01
+status: active
+tenant_id: nsi-amer
+department: Procurement
+doc_type: agreement
+classification: confidential
+owner: Procurement Manager
+approved_by: Chief Financial Officer
+next_review: 2026-09-01
+
+sections:
+  - heading: 1. Parties and Purpose
+    blocks:
+      - p: >-
+          This Supplier Management Agreement (the "Agreement") is entered into between
+          Northstar Industrial Americas, Inc. ("Northstar") and Kestrel Fluid Systems Ltd.
+          ("Supplier"), registered in Northstar's vendor master under supplier ID
+          **SUP-0007**.
+      - p: >-
+          Supplier is the original equipment manufacturer (OEM) of the NX-4400 hydraulic gear
+          pump, the NX-4400B marine-grade hydraulic gear pump and the NX-6200 axial piston
+          pump distributed by Northstar. This Agreement sets the commercial, delivery, quality
+          and warranty terms that apply to all purchase orders issued by Northstar to Supplier.
+
+  - heading: 2. Term
+    blocks:
+      - p: >-
+          The Agreement starts on the effective date and continues for an initial term of
+          **3 years**. It renews automatically for successive one-year periods unless either
+          party gives notice of non-renewal at least 90 days before the end of the current
+          term.
+
+  - heading: 3. Products and Ordering
+    blocks:
+      - table:
+          columns: [Product, Description, Delivery commitment]
+          widths: [0.15, 0.50, 0.35]
+          rows:
+            - [NX-4400, Hydraulic gear pump, 15 business days from PO]
+            - [NX-4400B, "Hydraulic gear pump, marine-grade", 15 business days from PO]
+            - [NX-6200, "Axial piston pump, build-to-order", 25 business days from PO]
+      - p: >-
+          Northstar issues purchase orders through its procurement system. Supplier confirms
+          each purchase order within 2 business days, including the committed ship date.
+
+  - heading: 4. Pricing and Payment
+    blocks:
+      - p: >-
+          Prices are set out in the price schedule attached to this Agreement. Supplier may
+          adjust prices **at most once per contract year**, with 60 days' written notice, and
+          any increase is capped at the change in the Consumer Price Index (CPI) plus 2%
+          (**CPI + 2%**).
+      - p: >-
+          Northstar pays undisputed invoices within **Net 45** days of receipt. Invoices must
+          reference a valid purchase order number.
+
+  - heading: 5. Delivery Performance
+    blocks:
+      - p: >-
+          Supplier shall achieve an on-time delivery rate of at least **95% per month**,
+          measured as the share of order lines shipped on or before the committed ship date.
+      - table:
+          columns: [Situation, Consequence]
+          widths: [0.40, 0.60]
+          rows:
+            - [Late delivery, "Penalty of 1.5% of the PO value per full week late, capped at 10% of the PO value."]
+            - [On-time delivery below 95% for a month, "Supplier presents a recovery plan at the next business review."]
+            - [On-time delivery below 95% for three consecutive months, "Northstar may re-source affected products without penalty."]
+
+  - heading: 6. Quality Requirements
+    blocks:
+      - p: >-
+          The defect rate shall not exceed **0.8% of units delivered per quarter**. If the
+          defect rate is exceeded, Supplier submits a corrective action plan within
+          **10 business days** and implements it at its own cost.
+      - bullets:
+          - Every unit is shipped with a test certificate and a unique serial number.
+          - Supplier maintains an ISO 9001 certified quality management system.
+          - Northstar may audit Supplier's facilities with 10 business days' notice.
+
+  - heading: 7. Warranty Pass-Through
+    blocks:
+      - p: >-
+          Supplier warrants the **NX-4400B for 36 months** and all **other pumps for
+          24 months** from the date of delivery to Northstar's end customer. Supplier
+          reimburses Northstar for parts, replacement units and reasonable freight for valid
+          warranty claims processed under Northstar's Product Warranty Policy.
+
+  - heading: 8. Governance
+    blocks:
+      - p: >-
+          The parties hold **quarterly business reviews** covering delivery performance,
+          quality, forecasts and open issues. Each party appoints a relationship manager
+          responsible for escalations.
+
+  - heading: 9. Termination
+    blocks:
+      - bullets:
+          - Either party may terminate for convenience with 90 days' written notice.
+          - Either party may terminate for cause if a material breach is not remedied within a 30-day cure period after written notice.
+          - Purchase orders confirmed before termination remain binding unless cancelled by mutual agreement.
+
+  - heading: 10. Confidentiality and Governing Law
+    blocks:
+      - p: >-
+          Each party keeps the other party's confidential information secret. Confidentiality
+          obligations **survive for 5 years** after termination. This Agreement is governed by
+          the laws of the **State of Ohio**.
+
+  - heading: 11. Revision History
+    blocks:
+      - table:
+          columns: [Version, Effective date, Summary of changes]
+          widths: [0.15, 0.20, 0.65]
+          rows:
+            - ["1.0", 2025-09-01, "Initial agreement signed by both parties."]

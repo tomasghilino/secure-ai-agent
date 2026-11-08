@@ -1,0 +1,89 @@
+# Tenant nsi-emea. Deliberately differs from the Americas returns policy (window, fee,
+# currency, approvers) to test tenant isolation: the same question must get a different
+# answer depending on the user's tenant.
+doc_id: NSI-EU-POL-RET-001
+title: Returns and Refunds Policy (EMEA)
+version: "1.2"
+effective_date: 2026-01-01
+status: active
+supersedes: "1.1"
+tenant_id: nsi-emea
+department: Customer Operations EMEA
+doc_type: policy
+classification: internal
+owner: Head of Customer Operations EMEA
+approved_by: Managing Director EMEA
+next_review: 2027-01-01
+
+sections:
+  - heading: 1. Purpose and Scope
+    blocks:
+      - p: >-
+          This policy defines how Northstar Industrial EMEA B.V. accepts returns of equipment
+          purchased by business customers in Europe, the Middle East and Africa, and how
+          refunds and restocking fees are calculated. All amounts are in euros (EUR).
+      - p: >-
+          Warranty claims for defective equipment are handled under the EMEA warranty terms
+          and take precedence over this policy where a manufacturing defect is confirmed.
+
+  - heading: 2. Return Eligibility
+    blocks:
+      - p: >-
+          A return request must be submitted within **21 calendar days of the delivery date**.
+          Equipment must be unused, complete and in its original packaging.
+      - table:
+          columns: [Item type, Returnable, Conditions]
+          widths: [0.30, 0.15, 0.55]
+          rows:
+            - [Standard catalog equipment, "Yes", "Unused, original packaging, request within 21 days"]
+            - [Build-to-order items, "No", "Not returnable; warranty terms apply to defects"]
+            - [Opened consumables and seal kits, "No", "Not returnable once opened"]
+
+  - heading: 3. Return Process
+    blocks:
+      - steps:
+          - The customer submits a return request through the customer portal with the original order number.
+          - Customer Operations EMEA validates eligibility and issues an RMA number within 2 business days.
+          - The customer ships the item to the EMEA distribution centre stated on the RMA.
+          - The distribution centre inspects the item within 5 business days of receipt.
+          - Customer Operations EMEA issues the refund or credit note.
+
+  - heading: 4. Restocking Fees and Refunds
+    blocks:
+      - table:
+          columns: [Return reason, Restocking fee, Freight paid by]
+          widths: [0.45, 0.25, 0.30]
+          rows:
+            - [Non-defective return, 12%, Customer]
+            - [Incorrect item shipped by Northstar, 0%, Northstar]
+            - [Item damaged in transit (reported within 48 hours), 0%, Northstar]
+      - p: >-
+          Refunds are issued **within 14 business days** after inspection. **VAT is refunded
+          on the same basis as the original invoice**; credit notes reference the original
+          invoice number for VAT reporting.
+
+  - heading: 5. Refund Approval Authority
+    blocks:
+      - table:
+          columns: [Refund amount (EUR), Approval required]
+          widths: [0.35, 0.65]
+          rows:
+            - ["Up to 8,000", Customer Operations Supervisor]
+            - ["Above 8,000", Head of Customer Operations EMEA]
+
+  - heading: 6. Non-Returnable Items
+    blocks:
+      - bullets:
+          - Build-to-order and custom-configured equipment.
+          - Opened consumables, lubricants, filters and seal kits.
+          - Equipment that has been installed, operated or modified by the customer.
+
+  - heading: 7. Revision History
+    blocks:
+      - table:
+          columns: [Version, Effective date, Summary of changes]
+          widths: [0.15, 0.20, 0.65]
+          rows:
+            - ["1.2", 2026-01-01, "Restocking fee set to 12%; approval threshold raised to EUR 8,000."]
+            - ["1.1", 2025-03-01, "VAT handling for credit notes clarified."]
+            - ["1.0", 2024-06-01, "Initial EMEA policy."]

@@ -192,7 +192,7 @@ def render_block(block: dict[str, Any], products: list[Product], width: float) -
             "Lead time (days)",
             "Returnable",
         ]
-        widths = [0.10, 0.18, 0.30, 0.11, 0.10, 0.09, 0.12]
+        widths = [0.12, 0.18, 0.28, 0.11, 0.10, 0.09, 0.12]  # SKU column must not wrap
         return [make_table(columns, rows, widths, width), Spacer(1, 8)]
     raise ValueError(f"unknown block type: {kind}")
 
