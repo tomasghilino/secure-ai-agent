@@ -10,6 +10,7 @@ dependencies = [
     "ollama>=0.6",
     "pydantic>=2.14",
     "pydantic-settings>=2.16",
+    "pymupdf>=2.1",
     "structlog>=26.1",
     "uvicorn[standard]>=0.54",
 ]
@@ -61,7 +62,7 @@ files = ["app", "scripts"]
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["reportlab.*"]  # ReportLab ships no type information
+module = ["reportlab.*", "pymupdf4llm.*"]  # no type information shipped
 ignore_missing_imports = true
 
 # ---------------------------------------------------------------- pytest
