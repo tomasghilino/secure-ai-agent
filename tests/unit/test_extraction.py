@@ -6,15 +6,6 @@ import pymupdf
 import pytest
 
 from app.ingestion.extraction import PdfValidationError, extract_pdf, parse_embedded_fields
-from scripts.generate_pdfs import SOURCE_DIR, generate
-
-
-@pytest.fixture(scope="module")
-def returns_policy_pdf(tmp_path_factory: pytest.TempPathFactory) -> bytes:
-    output = tmp_path_factory.mktemp("generated")
-    manifest = generate(SOURCE_DIR, output)
-    entry = next(d for d in manifest if d["doc_id"] == "NSI-POL-RET-003" and d["version"] == "3.0")
-    return (output / entry["file"]).read_bytes()
 
 
 def test_parse_embedded_fields_ignores_malformed_parts() -> None:
