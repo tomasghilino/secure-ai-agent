@@ -3,7 +3,7 @@
 # Windows (cmd.exe). Run `make help` to list targets.
 
 .DEFAULT_GOAL := help
-.PHONY: help setup data dev up down llm-up llm-pull test test-llm lint format typecheck check
+.PHONY: help setup data dev up down migrate migration llm-up llm-pull test test-llm lint format typecheck check
 
 OLLAMA_CHAT_MODEL ?= qwen3:8b
 OLLAMA_EMBEDDING_MODEL ?= qwen3-embedding:0.6b
@@ -26,6 +26,12 @@ up: ## Start only infrastructure services (db, sqs) in the background
 
 down: ## Stop the local stack, including Ollama (data and model volumes are kept)
 	docker compose --profile llm down
+
+migrate: ## Apply pending database migrations (needs `make up`)
+	uv run alembic upgrade head
+
+migration: ## Draft a migration from the models: make migration m="add x" (review it!)
+	uv run alembic revision --autogenerate -m "$(m)"
 
 llm-up: ## Start local Ollama on the NVIDIA GPU (compose profile `llm`)
 	docker compose --profile llm up -d --wait ollama

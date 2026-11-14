@@ -6,11 +6,15 @@ readme = "README.md"
 requires-python = ">=3.12,<3.13"
 # Dependencies are added incrementally with `uv add`, each in the commit that first uses it.
 dependencies = [
+    "alembic>=1.20.1",
     "fastapi>=0.162",
     "ollama>=0.6",
+    "pgvector>=0.5.1",
+    "psycopg[binary]>=3.3.9",
     "pydantic>=2.14",
     "pydantic-settings>=2.16",
     "pymupdf>=2.1",
+    "sqlalchemy[asyncio]>=2.1.8",
     "structlog>=26.1",
     "uvicorn[standard]>=0.54",
 ]
