@@ -3,7 +3,7 @@
 # Windows (cmd.exe). Run `make help` to list targets.
 
 .DEFAULT_GOAL := help
-.PHONY: help setup data dev up down migrate migration llm-up llm-pull test test-llm lint format typecheck check
+.PHONY: help setup data dev up down migrate migration ingest llm-up llm-pull test test-integration test-llm lint format typecheck check
 
 OLLAMA_CHAT_MODEL ?= qwen3:8b
 OLLAMA_EMBEDDING_MODEL ?= qwen3-embedding:0.6b
@@ -33,6 +33,9 @@ migrate: ## Apply pending database migrations (needs `make up`)
 migration: ## Draft a migration from the models: make migration m="add x" (review it!)
 	uv run alembic revision --autogenerate -m "$(m)"
 
+ingest: ## Ingest the generated PDFs into PostgreSQL (needs up, migrate, data; idempotent)
+	uv run python -m scripts.ingest_samples
+
 llm-up: ## Start local Ollama on the NVIDIA GPU (compose profile `llm`)
 	docker compose --profile llm up -d --wait ollama
 
@@ -42,6 +45,9 @@ llm-pull: llm-up ## Download the local chat and embedding models (~6 GB, once)
 
 test: ## Unit tests: no Docker, no AWS, no cost
 	uv run pytest tests/unit
+
+test-integration: ## Integration tests against local PostgreSQL (needs `make up`; free)
+	uv run pytest -m integration
 
 test-llm: ## Real-model tests against local Ollama (free; skipped if Ollama is down)
 	uv run pytest -m llm
