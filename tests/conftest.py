@@ -10,7 +10,12 @@ from collections.abc import Iterator, Mapping
 import pytest
 
 from app.core.config import get_settings
+from app.ingestion.pipeline import DocumentMetadata
 from scripts.generate_pdfs import SOURCE_DIR, generate
+from scripts.ingest_samples import metadata_from_manifest
+
+# (doc_key, version) -> (metadata, PDF bytes)
+GeneratedPdfs = dict[tuple[str, str], tuple[DocumentMetadata, bytes]]
 
 
 def pytest_asyncio_loop_factories(
@@ -32,9 +37,24 @@ def _isolated_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 
 @pytest.fixture(scope="session")
-def returns_policy_pdf(tmp_path_factory: pytest.TempPathFactory) -> bytes:
-    """Active Returns Policy v3.0 (3 pages), generated from the canonical YAML sources."""
+def generated_pdfs(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> GeneratedPdfs:
+    """Every synthetic PDF with its metadata, keyed by (doc_key, version).
+
+    Generated once per run from the canonical YAML sources.
+    """
     output = tmp_path_factory.mktemp("generated")
-    manifest = generate(SOURCE_DIR, output)
-    entry = next(d for d in manifest if d["doc_id"] == "NSI-POL-RET-003" and d["version"] == "3.0")
-    return (output / entry["file"]).read_bytes()
+    return {
+        (entry["doc_id"], entry["version"]): (
+            metadata_from_manifest(entry),
+            (output / entry["file"]).read_bytes(),
+        )
+        for entry in generate(SOURCE_DIR, output)
+    }
+
+
+@pytest.fixture(scope="session")
+def returns_policy_pdf(generated_pdfs: GeneratedPdfs) -> bytes:
+    """Active Returns Policy v3.0 (3 pages)."""
+    return generated_pdfs["NSI-POL-RET-003", "3.0"][1]
