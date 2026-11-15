@@ -1,6 +1,7 @@
 """Semantic search against a real PostgreSQL, with fake embeddings (word overlap)."""
 
 import pytest
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ingestion.pipeline import ingest_pdf
@@ -72,3 +73,25 @@ async def test_vectors_from_another_model_are_never_compared(
     )
 
     assert hits == []
+
+
+async def test_a_filtered_index_scan_still_finds_every_match(
+    session_with_returns_policies: AsyncSession,
+) -> None:
+    session = session_with_returns_policies
+    # Force the HNSW index (on a tiny table the planner prefers to sort every row) and let
+    # one index pass return only 10 candidates. The query is about the AMER policy, so the
+    # nearest candidates are AMER chunks, and the EMEA filter runs *after* the index.
+    await session.execute(text("SET LOCAL enable_seqscan = off"))
+    await session.execute(text("SET LOCAL enable_sort = off"))
+    await session.execute(text("SET LOCAL hnsw.ef_search = 10"))
+
+    hits = await search_chunks(
+        session,
+        FakeEmbeddings(),
+        "Director of Customer Operations strategic accounts late return 60 calendar days",
+        tenant_id="nsi-emea",
+        limit=100,
+    )
+
+    assert len(hits) == 8  # every EMEA chunk, not only those among the first candidates

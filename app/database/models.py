@@ -21,7 +21,16 @@ from datetime import date, datetime
 from typing import Any, ClassVar
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, MetaData, Text, UniqueConstraint, func
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    MetaData,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -73,7 +82,19 @@ class ChunkRecord(Base):
     """One chunk of a document version, with the embedding of its text."""
 
     __tablename__ = "chunks"
-    __table_args__ = (UniqueConstraint("document_id", "chunk_index"),)
+    __table_args__ = (
+        UniqueConstraint("document_id", "chunk_index"),
+        # Approximate nearest-neighbour index for `ORDER BY embedding <=> :query`. The
+        # operator class must match the operator: vector_cosine_ops serves `<=>` only.
+        # m / ef_construction are pgvector's defaults, written out to be visible.
+        Index(
+            "ix_chunks_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+            postgresql_with={"m": 16, "ef_construction": 64},
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, server_default=func.gen_random_uuid())
     document_id: Mapped[uuid.UUID] = mapped_column(

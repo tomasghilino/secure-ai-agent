@@ -6,8 +6,9 @@ instead of hidden behind a vector-store library: tenant and status filters are p
 the query itself, so a superseded version or another tenant's document can never be
 returned, and the same SQL grows into hybrid search later.
 
-Without a vector index this is an exact scan of every chunk of the tenant: fine for
-hundreds of chunks. An HNSW index makes it approximate and fast at larger scale.
+The HNSW index (``ix_chunks_embedding_hnsw``) makes the search approximate and fast on
+large tables. On a small table PostgreSQL may still prefer an exact scan, which is also
+correct: the planner chooses by cost.
 """
 
 from __future__ import annotations
@@ -63,6 +64,11 @@ async def search_chunks(
 ) -> list[SearchHit]:
     """The ``limit`` active chunks of ``tenant_id`` closest in meaning to ``query``."""
     query_embedding = await embeddings.embed_query(query)
+    # Through the HNSW index, the WHERE filters only see the candidates one index pass
+    # returns (hnsw.ef_search, 40 by default): a tenant with few chunks could get fewer
+    # than `limit` results, or none. Iterative scans keep walking the graph until enough
+    # rows pass the filters (pgvector >= 0.8). SET LOCAL ends with the transaction.
+    await session.execute(text("SET LOCAL hnsw.iterative_scan = strict_order"))
     rows = await session.execute(
         _SEARCH_SQL,
         {
