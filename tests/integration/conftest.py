@@ -17,9 +17,18 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import Settings
 from app.database.session import build_engine, build_session_factory
+from app.ingestion.pipeline import ingest_pdf
+from app.rag.embeddings import FakeEmbeddings
+from tests.conftest import GeneratedPdfs
 
 TEST_DATABASE = "northstar_test"
 ALEMBIC_INI = Path(__file__).resolve().parents[2] / "alembic.ini"
+
+# Three versions of the returns policy: the search must only ever see the active one of
+# the caller's tenant.
+RETURNS_V2_1 = ("NSI-POL-RET-003", "2.1")  # nsi-amer, superseded (45-day window)
+RETURNS_V3_0 = ("NSI-POL-RET-003", "3.0")  # nsi-amer, active (30-day window)
+RETURNS_EMEA = ("NSI-EU-POL-RET-001", "1.2")  # nsi-emea, active (21-day window)
 
 
 def alembic_config(connection: Connection) -> Config:
@@ -68,3 +77,14 @@ async def sessions(database_url: str) -> AsyncIterator[async_sessionmaker[AsyncS
 async def session(sessions: async_sessionmaker[AsyncSession]) -> AsyncIterator[AsyncSession]:
     async with sessions() as session:
         yield session
+
+
+@pytest.fixture
+async def session_with_returns_policies(
+    session: AsyncSession, generated_pdfs: GeneratedPdfs
+) -> AsyncSession:
+    """A session on a database holding the three returns policies (fake embeddings)."""
+    for key in (RETURNS_V2_1, RETURNS_V3_0, RETURNS_EMEA):
+        metadata, data = generated_pdfs[key]
+        await ingest_pdf(session, data, metadata, FakeEmbeddings())
+    return session

@@ -4,32 +4,17 @@ import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ingestion.pipeline import ingest_pdf
 from app.rag.embeddings import FakeEmbeddings
 from app.rag.retrieval import search_chunks
-from tests.conftest import GeneratedPdfs
+from tests.integration.conftest import RETURNS_EMEA, RETURNS_V3_0
 
 pytestmark = pytest.mark.integration
-
-RETURNS_V2_1 = ("NSI-POL-RET-003", "2.1")  # nsi-amer, superseded (45-day window)
-RETURNS_V3_0 = ("NSI-POL-RET-003", "3.0")  # nsi-amer, active (30-day window)
-RETURNS_EMEA = ("NSI-EU-POL-RET-001", "1.2")  # nsi-emea, active (21-day window)
 
 
 class OtherModel(FakeEmbeddings):
     @property
     def model_id(self) -> str:
         return "another-model"
-
-
-@pytest.fixture
-async def session_with_returns_policies(
-    session: AsyncSession, generated_pdfs: GeneratedPdfs
-) -> AsyncSession:
-    for key in (RETURNS_V2_1, RETURNS_V3_0, RETURNS_EMEA):
-        metadata, data = generated_pdfs[key]
-        await ingest_pdf(session, data, metadata, FakeEmbeddings())
-    return session
 
 
 @pytest.mark.parametrize(
