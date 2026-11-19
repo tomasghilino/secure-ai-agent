@@ -71,6 +71,17 @@ class Settings(BaseSettings):
     ingestion_max_receives: int = Field(default=3, ge=1)
     max_upload_bytes: int = Field(default=20 * 1024 * 1024, ge=1)
 
+    # --- RAG ---
+    # dense | keyword | hybrid. Compare them with `make eval-retrieval` before changing it.
+    rag_retrieval_mode: Literal["dense", "keyword", "hybrid"] = "hybrid"
+    rag_top_k: int = Field(default=8, ge=1, le=20)  # chunks retrieved per question
+    # Prompt budget for the sources: more context costs more and buries the best passage.
+    rag_max_context_tokens: int = Field(default=3000, ge=200, le=12000)
+
+    # Let the local model "think" before answering (Qwen3). Measured on the evaluation set:
+    # fixes table lookups the plain mode gets wrong, at ~10x latency and tokens.
+    llm_reasoning: bool = False
+
     # --- Cost guardrails ---
     llm_max_output_tokens: int = Field(default=800, ge=64, le=4096)
 

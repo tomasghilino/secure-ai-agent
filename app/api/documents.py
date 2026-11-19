@@ -35,7 +35,7 @@ class UploadForm(BaseModel):
     version: str = Field(pattern=r"^[0-9]{1,4}(\.[0-9]{1,4}){0,2}$", examples=["3.0"])
     title: str = Field(min_length=1, max_length=300)
     effective_date: date
-    classification: Literal["public", "internal", "confidential"]
+    classification: Literal["public", "internal", "confidential", "restricted"]
     status: Literal["draft", "active", "superseded"] = "active"
 
 

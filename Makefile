@@ -3,7 +3,7 @@
 # Windows (cmd.exe). Run `make help` to list targets.
 
 .DEFAULT_GOAL := help
-.PHONY: help setup data dev up down migrate migration seed ingest worker search llm-up llm-pull test test-integration test-llm lint format typecheck check
+.PHONY: help setup data dev up down migrate migration seed ingest worker search ask eval-retrieval eval-answers llm-up llm-pull test test-integration test-llm lint format typecheck check
 
 OLLAMA_CHAT_MODEL ?= qwen3:8b
 OLLAMA_EMBEDDING_MODEL ?= qwen3-embedding:0.6b
@@ -42,8 +42,17 @@ ingest: ## Ingest the generated PDFs into PostgreSQL (needs up, migrate, data; i
 worker: ## Run the ingestion worker on the host (needs up, migrate; Ctrl+C stops it)
 	uv run python -m app.ingestion.worker
 
-search: ## Semantic search over the ingested chunks: make search q="your question"
+search: ## Hybrid search over the ingested chunks: make search q="your question"
 	uv run python -m scripts.search "$(q)"
+
+ask: ## Answer a question with citations (RAG): make ask q="your question"
+	uv run python -m scripts.ask "$(q)"
+
+eval-retrieval: ## Retrieval metrics (dense vs keyword vs hybrid) on data/evaluation; free
+	uv run python -m scripts.evaluate_retrieval
+
+eval-answers: ## Answer checks (citations, refusals) on data/evaluation with the chat model
+	uv run python -m scripts.evaluate_answers
 
 llm-up: ## Start local Ollama on the NVIDIA GPU (compose profile `llm`)
 	docker compose --profile llm up -d --wait ollama

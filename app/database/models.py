@@ -29,6 +29,7 @@ from typing import Any, ClassVar
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     CheckConstraint,
+    Computed,
     DateTime,
     ForeignKey,
     Index,
@@ -40,7 +41,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # Changing this needs a migration AND re-embedding every chunk (the vectors of different
@@ -112,6 +113,8 @@ class ChunkRecord(Base):
             postgresql_ops={"embedding": "vector_cosine_ops"},
             postgresql_with={"m": 16, "ef_construction": 64},
         ),
+        # Inverted index for full-text search: lexeme -> chunks that contain it.
+        Index("ix_chunks_tsv", "tsv", postgresql_using="gin"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, server_default=func.gen_random_uuid())
@@ -125,6 +128,11 @@ class ChunkRecord(Base):
     content: Mapped[str]  # heading path + body: exactly the text that was embedded
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIMENSIONS))
     embedding_model: Mapped[str]  # which model produced the vector
+    # Full-text representation, computed by PostgreSQL from `content` on every write
+    # (never set by the application). English stemming: "returns" and "returned" -> "return".
+    tsv: Mapped[str] = mapped_column(
+        TSVECTOR, Computed("to_tsvector('english', content)", persisted=True)
+    )
 
 
 class IngestionJobRecord(Base):

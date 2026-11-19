@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app import __version__
+from app.api.ask import router as ask_router
 from app.api.documents import router as documents_router
 from app.api.health import router as health_router
 from app.api.search import router as search_router
@@ -17,6 +18,7 @@ from app.database.session import build_engine, build_session_factory
 from app.ingestion.queue import build_job_queue
 from app.ingestion.storage import build_storage
 from app.rag.embeddings import build_embedding_provider
+from app.rag.llm import build_chat_model
 
 
 @asynccontextmanager
@@ -30,6 +32,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.embeddings = build_embedding_provider(settings)
     app.state.storage = build_storage(settings)
     app.state.job_queue = build_job_queue(settings)
+    app.state.chat_model = build_chat_model(settings)
     log.info(
         "app.startup",
         environment=settings.app_env,
@@ -52,6 +55,7 @@ def create_app() -> FastAPI:
     app.include_router(health_router)
     app.include_router(search_router)
     app.include_router(documents_router)
+    app.include_router(ask_router)
     return app
 
 
