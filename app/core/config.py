@@ -9,6 +9,7 @@ time, so the chat model must be set explicitly once it has been verified.
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
@@ -19,6 +20,9 @@ Environment = Literal["local", "test", "staging"]
 # ollama  -> local open-weight models on the developer's GPU (free, private)
 # bedrock -> Amazon Bedrock (staging / benchmarks; costs money)
 Provider = Literal["fake", "ollama", "bedrock"]
+
+# ElasticMQ from docker compose, as seen from the host (containers override it).
+LOCAL_SQS_ENDPOINT = "http://localhost:9324"
 
 
 class Settings(BaseSettings):
@@ -55,6 +59,15 @@ class Settings(BaseSettings):
     bedrock_chat_model_id: str | None = None
     bedrock_embedding_model_id: str = "amazon.titan-embed-text-v2:0"
 
+    # --- Uploads, object storage and queue (ADR-0003) ---
+    # Uploaded PDFs: a local directory in development, S3 in staging (Day 4).
+    storage_root: Path = Path("data/storage")
+    # Unset = real SQS. Only staging may use it: local and test always talk to ElasticMQ,
+    # so a development machine never sends messages to AWS by accident.
+    sqs_endpoint_url: str | None = None
+    ingestion_queue_name: str = "northstar-ingestion"
+    max_upload_bytes: int = Field(default=20 * 1024 * 1024, ge=1)
+
     # --- Cost guardrails ---
     llm_max_output_tokens: int = Field(default=800, ge=64, le=4096)
 
@@ -73,6 +86,12 @@ class Settings(BaseSettings):
                 "LLM_PROVIDER=bedrock requires BEDROCK_CHAT_MODEL_ID "
                 "(verify availability in your region first)."
             )
+        return self
+
+    @model_validator(mode="after")
+    def _local_queue_endpoint(self) -> Settings:
+        if self.app_env != "staging" and self.sqs_endpoint_url is None:
+            self.sqs_endpoint_url = LOCAL_SQS_ENDPOINT
         return self
 
 

@@ -5,6 +5,7 @@ start of the run: development data is never touched, and the migrations get test
 Skipped when PostgreSQL is not reachable.
 """
 
+import uuid
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
@@ -18,10 +19,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.core.config import Settings
 from app.database.session import build_engine, build_session_factory
 from app.ingestion.pipeline import ingest_pdf
+from app.ingestion.queue import QueueMessage
+from app.ingestion.storage import LocalFileStorage
 from app.rag.embeddings import FakeEmbeddings
 from tests.conftest import GeneratedPdfs
 
 TEST_DATABASE = "northstar_test"
+SUPPORT_SLA = ("NSI-SLA-CS-002", "2.1")  # nsi-amer, not in session_with_returns_policies
 ALEMBIC_INI = Path(__file__).resolve().parents[2] / "alembic.ini"
 
 # Three versions of the returns policy: the search must only ever see the active one of
@@ -88,3 +92,34 @@ async def session_with_returns_policies(
         metadata, data = generated_pdfs[key]
         await ingest_pdf(session, data, metadata, FakeEmbeddings())
     return session
+
+
+class InMemoryJobQueue:
+    """JobQueue test double: keeps sent job ids in a list (no SQS semantics)."""
+
+    def __init__(self) -> None:
+        self.sent: list[uuid.UUID] = []
+        self.deleted: list[QueueMessage] = []
+
+    async def send(self, job_id: uuid.UUID) -> None:
+        self.sent.append(job_id)
+
+    async def receive(self) -> list[QueueMessage]:
+        messages = [
+            QueueMessage(job_id, str(i), receive_count=1) for i, job_id in enumerate(self.sent)
+        ]
+        self.sent = []
+        return messages
+
+    async def delete(self, message: QueueMessage) -> None:
+        self.deleted.append(message)
+
+
+@pytest.fixture
+def queue() -> InMemoryJobQueue:
+    return InMemoryJobQueue()
+
+
+@pytest.fixture
+def storage(tmp_path: Path) -> LocalFileStorage:
+    return LocalFileStorage(tmp_path / "storage")

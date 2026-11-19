@@ -8,11 +8,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app import __version__
+from app.api.documents import router as documents_router
 from app.api.health import router as health_router
 from app.api.search import router as search_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
 from app.database.session import build_engine, build_session_factory
+from app.ingestion.queue import build_job_queue
+from app.ingestion.storage import build_storage
 from app.rag.embeddings import build_embedding_provider
 
 
@@ -25,6 +28,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     engine = build_engine(settings.database_url)
     app.state.session_factory = build_session_factory(engine)
     app.state.embeddings = build_embedding_provider(settings)
+    app.state.storage = build_storage(settings)
+    app.state.job_queue = build_job_queue(settings)
     log.info(
         "app.startup",
         environment=settings.app_env,
@@ -46,6 +51,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(health_router)
     app.include_router(search_router)
+    app.include_router(documents_router)
     return app
 
 

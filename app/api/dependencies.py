@@ -15,6 +15,8 @@ from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import Settings, get_settings
+from app.ingestion.queue import JobQueue
+from app.ingestion.storage import ObjectStorage
 from app.rag.embeddings import EmbeddingProvider
 
 TENANT_HEADER = "X-Tenant-ID"
@@ -30,6 +32,16 @@ async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
 def get_embeddings(request: Request) -> EmbeddingProvider:
     embeddings: EmbeddingProvider = request.app.state.embeddings
     return embeddings
+
+
+def get_storage(request: Request) -> ObjectStorage:
+    storage: ObjectStorage = request.app.state.storage
+    return storage
+
+
+def get_job_queue(request: Request) -> JobQueue:
+    queue: JobQueue = request.app.state.job_queue
+    return queue
 
 
 def get_tenant_id(
@@ -50,6 +62,9 @@ def get_tenant_id(
     return x_tenant_id
 
 
+SettingsDep = Annotated[Settings, Depends(get_settings)]
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 EmbeddingsDep = Annotated[EmbeddingProvider, Depends(get_embeddings)]
+StorageDep = Annotated[ObjectStorage, Depends(get_storage)]
+JobQueueDep = Annotated[JobQueue, Depends(get_job_queue)]
 TenantDep = Annotated[str, Depends(get_tenant_id)]

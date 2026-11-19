@@ -39,3 +39,20 @@ def test_empty_env_values_fall_back_to_defaults(monkeypatch: pytest.MonkeyPatch)
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
 
     assert settings.aws_profile is None
+
+
+@pytest.mark.parametrize("app_env", ["local", "test"])
+def test_local_environments_always_use_the_local_queue(
+    monkeypatch: pytest.MonkeyPatch, app_env: str
+) -> None:
+    monkeypatch.setenv("APP_ENV", app_env)
+    monkeypatch.delenv("SQS_ENDPOINT_URL", raising=False)
+
+    assert Settings(_env_file=None).sqs_endpoint_url == "http://localhost:9324"  # type: ignore[call-arg]
+
+
+def test_staging_uses_the_real_queue(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_ENV", "staging")
+    monkeypatch.delenv("SQS_ENDPOINT_URL", raising=False)
+
+    assert Settings(_env_file=None).sqs_endpoint_url is None  # type: ignore[call-arg]

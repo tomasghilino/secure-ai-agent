@@ -107,3 +107,45 @@ class ChunkRecord(Base):
     content: Mapped[str]  # heading path + body: exactly the text that was embedded
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIMENSIONS))
     embedding_model: Mapped[str]  # which model produced the vector
+
+
+class IngestionJobRecord(Base):
+    """One uploaded PDF waiting for, or processed by, the ingestion worker.
+
+    The API creates it (``queued``) and the worker moves it to ``running`` and then to
+    ``succeeded`` or ``failed``. Until the worker creates the document row, the job
+    carries the version's registry metadata.
+    """
+
+    __tablename__ = "ingestion_jobs"
+    __table_args__ = (
+        CheckConstraint("status IN ('queued', 'running', 'succeeded', 'failed')", name="status"),
+        CheckConstraint(
+            "document_status IN ('draft', 'active', 'superseded')", name="document_status"
+        ),
+        # The upload looks for a job of the same file before creating another one.
+        Index("ix_ingestion_jobs_tenant_id_sha256", "tenant_id", "sha256"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, server_default=func.gen_random_uuid())
+    tenant_id: Mapped[str]
+    status: Mapped[str]
+    attempts: Mapped[int]  # how many times a worker started it
+    error: Mapped[str | None]  # why it failed (last attempt)
+    sha256: Mapped[str]
+    storage_key: Mapped[str]  # where the uploaded PDF is stored
+    # Registry metadata of the uploaded version (becomes the documents row).
+    doc_key: Mapped[str]
+    version: Mapped[str]
+    title: Mapped[str]
+    document_status: Mapped[str]
+    effective_date: Mapped[date]
+    classification: Mapped[str]
+    # Set when the job succeeds.
+    document_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("documents.id", ondelete="SET NULL")
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )

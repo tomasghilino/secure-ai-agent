@@ -3,7 +3,7 @@
 # Windows (cmd.exe). Run `make help` to list targets.
 
 .DEFAULT_GOAL := help
-.PHONY: help setup data dev up down migrate migration ingest search llm-up llm-pull test test-integration test-llm lint format typecheck check
+.PHONY: help setup data dev up down migrate migration ingest worker search llm-up llm-pull test test-integration test-llm lint format typecheck check
 
 OLLAMA_CHAT_MODEL ?= qwen3:8b
 OLLAMA_EMBEDDING_MODEL ?= qwen3-embedding:0.6b
@@ -18,7 +18,7 @@ setup: ## Install Python 3.12 deps (all groups) and create .env if missing
 data: ## Generate the synthetic PDFs + manifest from data/source (deterministic)
 	uv run python -m scripts.generate_pdfs
 
-dev: ## Run the full local stack (PostgreSQL+pgvector, ElasticMQ, API) with hot reload
+dev: ## Run the full local stack (PostgreSQL+pgvector, ElasticMQ, API, worker)
 	docker compose up --build
 
 up: ## Start only infrastructure services (db, sqs) in the background
@@ -35,6 +35,9 @@ migration: ## Draft a migration from the models: make migration m="add x" (revie
 
 ingest: ## Ingest the generated PDFs into PostgreSQL (needs up, migrate, data; idempotent)
 	uv run python -m scripts.ingest_samples
+
+worker: ## Run the ingestion worker on the host (needs up, migrate; Ctrl+C stops it)
+	uv run python -m app.ingestion.worker
 
 search: ## Semantic search over the ingested chunks: make search q="your question"
 	uv run python -m scripts.search "$(q)"
