@@ -12,12 +12,18 @@ Design notes:
   cannot go stale, and the chunks table can enforce tenant isolation on its own (RLS).
 - ``status`` is text + CHECK instead of a PostgreSQL ENUM: adding a value to a CHECK is a
   simple migration, while ENUM changes are awkward (values cannot be removed).
+- Every table with a ``tenant_id`` column is protected by Row-Level Security (see
+  ``app/database/tenancy.py``). A new tenant table needs its grant and policy in the same
+  migration; a test fails otherwise.
+- Business records have readable natural keys (``C-1001``, ``SO-2026-0101``) next to the
+  UUID: people and tools refer to records by number, never by UUID.
 """
 
 from __future__ import annotations
 
 import uuid
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Any, ClassVar
 
 from pgvector.sqlalchemy import Vector
@@ -27,9 +33,12 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     MetaData,
+    Numeric,
+    PrimaryKeyConstraint,
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -62,6 +71,15 @@ class DocumentRecord(Base):
         UniqueConstraint("tenant_id", "doc_key", "version"),  # a version is registered once
         UniqueConstraint("tenant_id", "sha256"),  # the same file is ingested once
         CheckConstraint("status IN ('draft', 'active', 'superseded')", name="status"),
+        # At most one active version per document: a partial unique index (only the rows
+        # matching WHERE are indexed). Ingesting a newer active version supersedes the old one.
+        Index(
+            "uq_documents_one_active_version",
+            "tenant_id",
+            "doc_key",
+            unique=True,
+            postgresql_where=text("status = 'active'"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, server_default=func.gen_random_uuid())
@@ -149,3 +167,160 @@ class IngestionJobRecord(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+class EmbeddingCacheRecord(Base):
+    """A vector already computed for a text, so unchanged text is never embedded twice.
+
+    Keyed by tenant: sharing vectors across tenants would let one tenant learn, from a
+    cache hit, that another tenant has the exact same text.
+    """
+
+    __tablename__ = "embedding_cache"
+    __table_args__ = (
+        PrimaryKeyConstraint("tenant_id", "model_id", "dimensions", "content_sha256"),
+    )
+
+    tenant_id: Mapped[str]
+    model_id: Mapped[str]
+    dimensions: Mapped[int]
+    content_sha256: Mapped[str]
+    embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIMENSIONS))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# --------------------------------------------------------------------------- business data
+# Read by the agent's tools (Day 3). Seeded from data/source/business with `make seed`.
+
+Money = Numeric(12, 2)  # exact decimal amounts, never float
+
+
+class ProductRecord(Base):
+    __tablename__ = "products"
+    __table_args__ = (UniqueConstraint("tenant_id", "sku"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[str]
+    sku: Mapped[str]
+    name: Mapped[str]
+    category: Mapped[str]
+    specs: Mapped[str]
+    list_price: Mapped[Decimal] = mapped_column(Money)
+    currency: Mapped[str]
+    warranty_months: Mapped[int]
+    lead_time_days: Mapped[int]
+    returnable: Mapped[bool]
+
+
+class CustomerRecord(Base):
+    __tablename__ = "customers"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "customer_number"),
+        CheckConstraint("support_tier IN ('standard', 'premium', 'platinum')", name="support_tier"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[str]
+    customer_number: Mapped[str]
+    name: Mapped[str]
+    segment: Mapped[str]
+    country: Mapped[str]
+    support_tier: Mapped[str]  # sets the SLA targets (NSI-SLA-CS-002)
+
+
+class OrderRecord(Base):
+    __tablename__ = "orders"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "order_number"),
+        CheckConstraint(
+            "status IN ('confirmed', 'shipped', 'delivered', 'cancelled')", name="status"
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[str]
+    order_number: Mapped[str]
+    customer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("customers.id"))
+    status: Mapped[str]
+    order_date: Mapped[date]
+    delivered_date: Mapped[date | None]  # starts the return window and the warranty
+    currency: Mapped[str]
+    total_amount: Mapped[Decimal] = mapped_column(Money)
+
+
+class OrderLineRecord(Base):
+    __tablename__ = "order_lines"
+    __table_args__ = (UniqueConstraint("order_id", "line_number"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[str]
+    order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"))
+    line_number: Mapped[int]
+    product_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("products.id"))
+    quantity: Mapped[int]
+    unit_price: Mapped[Decimal] = mapped_column(Money)
+    final_sale: Mapped[bool]  # clearance: not returnable (NSI-POL-RET-003 §7)
+
+
+class InvoiceRecord(Base):
+    __tablename__ = "invoices"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "invoice_number"),
+        # "Overdue" is not a status: it is open + past due_date, computed when asked.
+        CheckConstraint("status IN ('open', 'paid', 'void')", name="status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[str]
+    invoice_number: Mapped[str]
+    order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id"))
+    customer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("customers.id"))
+    issue_date: Mapped[date]
+    due_date: Mapped[date]
+    amount: Mapped[Decimal] = mapped_column(Money)
+    currency: Mapped[str]
+    status: Mapped[str]
+    paid_date: Mapped[date | None]
+
+
+class SupportTicketRecord(Base):
+    __tablename__ = "support_tickets"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "ticket_number"),
+        CheckConstraint("priority IN ('P1', 'P2', 'P3', 'P4')", name="priority"),
+        CheckConstraint("status IN ('open', 'in_progress', 'resolved', 'closed')", name="status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[str]
+    ticket_number: Mapped[str]
+    customer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("customers.id"))
+    order_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("orders.id"))
+    product_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("products.id"))
+    priority: Mapped[str]
+    status: Mapped[str]
+    subject: Mapped[str]
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    first_response_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class SupplierRecord(Base):
+    __tablename__ = "suppliers"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "supplier_code"),
+        CheckConstraint("status IN ('approved', 'pending', 'suspended')", name="status"),
+        CheckConstraint("risk_rating IN ('low', 'medium', 'high')", name="risk_rating"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)
+    tenant_id: Mapped[str]
+    supplier_code: Mapped[str]
+    name: Mapped[str]
+    category: Mapped[str]
+    country: Mapped[str]
+    status: Mapped[str]
+    risk_rating: Mapped[str]
+    annual_spend: Mapped[Decimal] = mapped_column(Money)
+    currency: Mapped[str]
+    contract_doc_key: Mapped[str | None]  # e.g. NSI-AGR-SUP-014

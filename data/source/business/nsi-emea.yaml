@@ -1,0 +1,47 @@
+# Business records of tenant nsi-emea (see nsi-amer.yaml for the conventions).
+# Returns within 21 days of delivery (NSI-EU-POL-RET-001 v1.2). Reference date 2026-11-15.
+currency: EUR
+
+# EMEA sells a subset of the catalog in euros: names and specs come from products.yaml.
+products:
+  - {sku: CP-150S, list_price: 4980}
+  - {sku: AC-110V, list_price: 13900}
+  - {sku: CV-50E, list_price: 2350}
+
+customers:
+  - {number: C-2001, name: Rotterdam Food Ingredients B.V., segment: food processing, country: NL, support_tier: premium}
+  - {number: C-2002, name: Hamburg Hafenservice GmbH, segment: marine, country: DE, support_tier: standard}
+  - {number: C-2003, name: Lyon Pharma Process SAS, segment: pharmaceuticals, country: FR, support_tier: platinum}
+
+orders:
+  # Delivered 17 days before the reference date: within the 21-day EMEA window.
+  - number: SO-EU-2026-0201
+    customer: C-2001
+    status: delivered
+    order_date: 2026-10-21
+    delivered_date: 2026-10-29
+    lines: [{sku: CP-150S, quantity: 2}]
+  # Delivered 36 days before: outside the EMEA window (see ticket T-6002).
+  - number: SO-EU-2026-0202
+    customer: C-2002
+    status: delivered
+    order_date: 2026-10-01
+    delivered_date: 2026-10-10
+    lines: [{sku: AC-110V, quantity: 1}]
+  - number: SO-EU-2026-0203
+    customer: C-2003
+    status: shipped
+    order_date: 2026-11-09
+    lines: [{sku: CV-50E, quantity: 8}]
+
+invoices:
+  - {number: INV-EU-2026-0201, order: SO-EU-2026-0201, issue_date: 2026-10-29, due_date: 2026-11-28, status: open}
+  - {number: INV-EU-2026-0202, order: SO-EU-2026-0202, issue_date: 2026-10-10, due_date: 2026-11-09, status: paid, paid_date: 2026-11-03}
+  - {number: INV-EU-2026-0203, order: SO-EU-2026-0203, issue_date: 2026-11-12, due_date: 2026-12-12, status: open}
+
+tickets:
+  - {number: T-6001, customer: C-2003, order: SO-EU-2026-0203, sku: CV-50E, priority: P3, status: open, subject: Delivery date confirmation for valves, opened_at: "2026-11-13T10:00:00Z", first_response_at: "2026-11-13T14:00:00Z"}
+  - {number: T-6002, customer: C-2002, order: SO-EU-2026-0202, sku: AC-110V, priority: P4, status: open, subject: Request to return compressor, opened_at: "2026-11-14T09:30:00Z"}
+
+suppliers:
+  - {code: SUP-E004, name: Valvetech GmbH, category: control valves, country: DE, status: approved, risk_rating: medium, annual_spend: 380000}

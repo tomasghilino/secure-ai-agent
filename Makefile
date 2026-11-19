@@ -3,7 +3,7 @@
 # Windows (cmd.exe). Run `make help` to list targets.
 
 .DEFAULT_GOAL := help
-.PHONY: help setup data dev up down migrate migration ingest worker search llm-up llm-pull test test-integration test-llm lint format typecheck check
+.PHONY: help setup data dev up down migrate migration seed ingest worker search llm-up llm-pull test test-integration test-llm lint format typecheck check
 
 OLLAMA_CHAT_MODEL ?= qwen3:8b
 OLLAMA_EMBEDDING_MODEL ?= qwen3-embedding:0.6b
@@ -32,6 +32,9 @@ migrate: ## Apply pending database migrations (needs `make up`)
 
 migration: ## Draft a migration from the models: make migration m="add x" (review it!)
 	uv run alembic revision --autogenerate -m "$(m)"
+
+seed: ## Load the business records (customers, orders, invoices...) from data/source/business
+	uv run python -m scripts.seed_business_data
 
 ingest: ## Ingest the generated PDFs into PostgreSQL (needs up, migrate, data; idempotent)
 	uv run python -m scripts.ingest_samples

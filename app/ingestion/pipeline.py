@@ -18,6 +18,14 @@ nothing behind, never a document with half of its chunks. Extraction and embeddi
 
 A different file registered under an existing ``doc_key`` + ``version`` is not a duplicate
 but a conflict: that insert fails with ``IntegrityError`` instead of being skipped.
+
+Two more rules, both inside that transaction:
+
+- **One active version per document.** A new ``active`` version supersedes the previous
+  active one. If a newer version (later effective date) is already active, the incoming
+  one is stored as ``superseded`` instead. A partial unique index enforces the rule.
+- **Embedding cache.** Chunks whose exact text was already embedded with this model are
+  not embedded again (``app/rag/embedding_cache.py``).
 """
 
 from __future__ import annotations
@@ -28,14 +36,15 @@ import uuid
 from dataclasses import asdict, dataclass
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import EMBEDDING_DIMENSIONS, ChunkRecord, DocumentRecord
-from app.ingestion.chunking import DEFAULT_MAX_CHARS, chunk_pages
+from app.ingestion.chunking import DEFAULT_MAX_CHARS, Chunk, chunk_pages
 from app.ingestion.extraction import extract_pdf
 from app.ingestion.normalization import normalize_pages
+from app.rag.embedding_cache import embed_documents_cached
 from app.rag.embeddings import EmbeddingProvider
 
 
@@ -62,6 +71,12 @@ class IngestionResult:
     skipped: bool  # True when this tenant already had the same file
     document_id: uuid.UUID | None = None
     chunk_count: int = 0
+    cache_hits: int = 0  # chunks whose embedding came from the cache
+    status: str | None = None  # stored status (an "active" upload may become "superseded")
+
+
+class _AlreadyStored(Exception):
+    """Raised inside the transaction to roll it back: another worker stored the file."""
 
 
 async def ingest_pdf(
@@ -93,32 +108,78 @@ async def ingest_pdf(
     chunks = chunk_pages(normalize_pages(extracted.pages).pages, max_chars=max_chars)
     if not chunks:
         raise IngestionError("no text could be extracted (scanned PDF? OCR is not supported)")
-    vectors = await embeddings.embed_documents([chunk.text for chunk in chunks])
+    embedded = await embed_documents_cached(
+        session, embeddings, metadata.tenant_id, [chunk.text for chunk in chunks]
+    )
 
-    async with session.begin():  # one transaction: the document and all its chunks, or nothing
-        # Layer 2: if another worker inserted the same file meanwhile, insert nothing.
-        document_id = await session.scalar(
-            insert(DocumentRecord)
-            .values(sha256=sha256, **asdict(metadata))
-            .on_conflict_do_nothing(index_elements=["tenant_id", "sha256"])
-            .returning(DocumentRecord.id)
+    try:
+        # One transaction: the document, its chunks and the status change, or nothing.
+        async with session.begin():
+            status = await _resolve_status(session, metadata)
+            # Layer 2: if another worker inserted the same file meanwhile, insert nothing.
+            document_id = await session.scalar(
+                insert(DocumentRecord)
+                .values(sha256=sha256, **(asdict(metadata) | {"status": status}))
+                .on_conflict_do_nothing(index_elements=["tenant_id", "sha256"])
+                .returning(DocumentRecord.id)
+            )
+            if document_id is None:
+                raise _AlreadyStored  # also undoes the supersede done by _resolve_status
+            await _insert_chunks(
+                session, document_id, metadata, chunks, embedded.vectors, embeddings
+            )
+    except _AlreadyStored:
+        return IngestionResult(skipped=True)
+    return IngestionResult(
+        skipped=False,
+        document_id=document_id,
+        chunk_count=len(chunks),
+        cache_hits=embedded.hits,
+        status=status,
+    )
+
+
+async def _resolve_status(session: AsyncSession, metadata: DocumentMetadata) -> str:
+    """The status to store; supersedes the current active version when this one replaces it."""
+    if metadata.status != "active":
+        return metadata.status
+    same_document = (
+        DocumentRecord.tenant_id == metadata.tenant_id,
+        DocumentRecord.doc_key == metadata.doc_key,
+        DocumentRecord.status == "active",
+    )
+    newer = await session.scalar(
+        select(DocumentRecord.id).where(
+            *same_document, DocumentRecord.effective_date > metadata.effective_date
         )
-        if document_id is None:
-            return IngestionResult(skipped=True)
-        await session.execute(
-            insert(ChunkRecord),
-            [
-                {
-                    "document_id": document_id,
-                    "tenant_id": metadata.tenant_id,
-                    "chunk_index": chunk.index,
-                    "page_number": chunk.page_number,
-                    "section_path": list(chunk.section_path),
-                    "content": chunk.text,
-                    "embedding": vector,
-                    "embedding_model": embeddings.model_id,
-                }
-                for chunk, vector in zip(chunks, vectors, strict=True)
-            ],
-        )
-    return IngestionResult(skipped=False, document_id=document_id, chunk_count=len(chunks))
+    )
+    if newer is not None:
+        return "superseded"  # an older version arrived after a newer one
+    await session.execute(update(DocumentRecord).where(*same_document).values(status="superseded"))
+    return "active"
+
+
+async def _insert_chunks(
+    session: AsyncSession,
+    document_id: uuid.UUID,
+    metadata: DocumentMetadata,
+    chunks: list[Chunk],
+    vectors: list[list[float]],
+    embeddings: EmbeddingProvider,
+) -> None:
+    await session.execute(
+        insert(ChunkRecord),
+        [
+            {
+                "document_id": document_id,
+                "tenant_id": metadata.tenant_id,
+                "chunk_index": chunk.index,
+                "page_number": chunk.page_number,
+                "section_path": list(chunk.section_path),
+                "content": chunk.text,
+                "embedding": vector,
+                "embedding_model": embeddings.model_id,
+            }
+            for chunk, vector in zip(chunks, vectors, strict=True)
+        ],
+    )

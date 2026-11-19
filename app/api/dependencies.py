@@ -1,9 +1,9 @@
 """What each request receives through FastAPI's ``Depends`` (≈ NestJS providers and guards).
 
-Long-lived resources (the connection pool, the embedding client) are created once in the
-app lifespan and kept on ``app.state``; these functions hand them to each request.
-Endpoints declare what they need with the ``*Dep`` aliases, and tests swap them with
-``app.dependency_overrides``.
+Long-lived resources (the connection pool, the embedding client, the queue client) are
+created once in the app lifespan and kept on ``app.state``; these functions hand them to
+each request. Endpoints declare what they need with the ``*Dep`` aliases, and tests swap
+them with ``app.dependency_overrides``.
 """
 
 from __future__ import annotations
@@ -15,33 +15,12 @@ from fastapi import Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import Settings, get_settings
+from app.database.tenancy import tenant_session
 from app.ingestion.queue import JobQueue
 from app.ingestion.storage import ObjectStorage
 from app.rag.embeddings import EmbeddingProvider
 
 TENANT_HEADER = "X-Tenant-ID"
-
-
-async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
-    """One database session per request, closed once the response is sent."""
-    factory: async_sessionmaker[AsyncSession] = request.app.state.session_factory
-    async with factory() as session:
-        yield session
-
-
-def get_embeddings(request: Request) -> EmbeddingProvider:
-    embeddings: EmbeddingProvider = request.app.state.embeddings
-    return embeddings
-
-
-def get_storage(request: Request) -> ObjectStorage:
-    storage: ObjectStorage = request.app.state.storage
-    return storage
-
-
-def get_job_queue(request: Request) -> JobQueue:
-    queue: JobQueue = request.app.state.job_queue
-    return queue
 
 
 def get_tenant_id(
@@ -62,9 +41,37 @@ def get_tenant_id(
     return x_tenant_id
 
 
+async def get_session(
+    request: Request, tenant_id: Annotated[str, Depends(get_tenant_id)]
+) -> AsyncIterator[AsyncSession]:
+    """One database session per request, closed once the response is sent.
+
+    It runs under the caller's tenant (Row-Level Security): even a query that forgot its
+    tenant filter cannot read or write another tenant's rows.
+    """
+    factory: async_sessionmaker[AsyncSession] = request.app.state.session_factory
+    async with tenant_session(factory, tenant_id) as session:
+        yield session
+
+
+def get_embeddings(request: Request) -> EmbeddingProvider:
+    embeddings: EmbeddingProvider = request.app.state.embeddings
+    return embeddings
+
+
+def get_storage(request: Request) -> ObjectStorage:
+    storage: ObjectStorage = request.app.state.storage
+    return storage
+
+
+def get_job_queue(request: Request) -> JobQueue:
+    queue: JobQueue = request.app.state.job_queue
+    return queue
+
+
 SettingsDep = Annotated[Settings, Depends(get_settings)]
+TenantDep = Annotated[str, Depends(get_tenant_id)]
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 EmbeddingsDep = Annotated[EmbeddingProvider, Depends(get_embeddings)]
 StorageDep = Annotated[ObjectStorage, Depends(get_storage)]
 JobQueueDep = Annotated[JobQueue, Depends(get_job_queue)]
-TenantDep = Annotated[str, Depends(get_tenant_id)]

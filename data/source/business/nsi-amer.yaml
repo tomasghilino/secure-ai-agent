@@ -1,0 +1,142 @@
+# Business records of tenant nsi-amer: the source of the customers, orders, invoices,
+# support tickets and suppliers tables (`make seed`). Products come from products.yaml.
+# All names and figures are fictional.
+#
+# Many records are deliberate scenarios for the agent (Day 3), noted in comments. They are
+# written against a reference date of 2026-11-15 and the active policies:
+# returns within 30 days of delivery (NSI-POL-RET-003 v3.0; 45 days in the superseded v2.1),
+# build-to-order and final-sale items not returnable, SLA response targets per support tier
+# (NSI-SLA-CS-002), Kestrel Fluid Systems as supplier SUP-0007 (NSI-AGR-SUP-014).
+currency: USD
+
+customers:
+  - {number: C-1001, name: Riverside Bottling Co., segment: food processing, country: US, support_tier: premium}
+  - {number: C-1002, name: Gulf Coast Marine Services, segment: marine, country: US, support_tier: platinum}
+  - {number: C-1003, name: Summit Steel Fabrication, segment: manufacturing, country: US, support_tier: standard}
+  - {number: C-1004, name: Prairie Energy Partners, segment: energy, country: US, support_tier: premium}
+  - {number: C-1005, name: Andes Mining S.A., segment: mining, country: CL, support_tier: standard}
+  - {number: C-1006, name: Great Lakes Packaging, segment: manufacturing, country: US, support_tier: standard}
+  - {number: C-1007, name: Bayou Chemical Works, segment: chemicals, country: US, support_tier: premium}
+  - {number: C-1008, name: Pacific Seafood Processors, segment: food processing, country: US, support_tier: platinum}
+
+# unit_price defaults to the product's list price; `final_sale: true` marks clearance lines.
+orders:
+  # Delivered 12 days before the reference date: within the 30-day return window.
+  - number: SO-2026-0101
+    customer: C-1001
+    status: delivered
+    order_date: 2026-10-27
+    delivered_date: 2026-11-03
+    lines: [{sku: CP-150S, quantity: 2}]
+  # Build-to-order pump: not returnable, whatever the date.
+  - number: SO-2026-0102
+    customer: C-1003
+    status: delivered
+    order_date: 2026-09-22
+    delivered_date: 2026-10-28
+    lines: [{sku: NX-6200, quantity: 1}]
+  # Delivered 40 days before the reference date: returnable under the superseded v2.1
+  # (45 days), NOT under the active v3.0 (30 days). The outdated-policy trap.
+  - number: SO-2026-0103
+    customer: C-1006
+    status: delivered
+    order_date: 2026-09-28
+    delivered_date: 2026-10-06
+    lines: [{sku: AC-110, quantity: 1}]
+  - number: SO-2026-0104
+    customer: C-1004
+    status: shipped
+    order_date: 2026-11-02
+    lines: [{sku: AC-110V, quantity: 2}]
+  - number: SO-2026-0105
+    customer: C-1005
+    status: confirmed
+    order_date: 2026-11-12
+    lines: [{sku: SM-750X, quantity: 6}]
+  # Its invoice is long overdue.
+  - number: SO-2026-0106
+    customer: C-1007
+    status: delivered
+    order_date: 2026-08-03
+    delivered_date: 2026-08-14
+    lines: [{sku: CV-50E, quantity: 10}]
+  # Recent delivery, but the valves were sold as clearance: final sale, not returnable.
+  - number: SO-2026-0107
+    customer: C-1008
+    status: delivered
+    order_date: 2026-10-30
+    delivered_date: 2026-11-07
+    lines:
+      - {sku: CP-150S, quantity: 3}
+      - {sku: CV-50, quantity: 5, unit_price: 1450, final_sale: true}
+  - number: SO-2026-0108
+    customer: C-1001
+    status: cancelled
+    order_date: 2026-10-15
+    lines: [{sku: CP-300, quantity: 1}]
+  # Marine pumps under their 36-month warranty (see ticket T-5005).
+  - number: SO-2026-0109
+    customer: C-1002
+    status: delivered
+    order_date: 2026-05-18
+    delivered_date: 2026-06-02
+    lines: [{sku: NX-4400B, quantity: 2}]
+  - number: SO-2026-0110
+    customer: C-1003
+    status: delivered
+    order_date: 2026-10-08
+    delivered_date: 2026-10-20
+    lines: [{sku: NX-4400, quantity: 3}]
+  - number: SO-2026-0111
+    customer: C-1006
+    status: delivered
+    order_date: 2026-11-04
+    delivered_date: 2026-11-12
+    lines: [{sku: SM-750, quantity: 4}]
+  - number: SO-2026-0112
+    customer: C-1002
+    status: delivered
+    order_date: 2026-10-01
+    delivered_date: 2026-10-09
+    lines: [{sku: NX-4400B, quantity: 4}, {sku: CV-50E, quantity: 2}]
+
+# The amount is the order total; status is open | paid | void ("overdue" = open and past due).
+invoices:
+  - {number: INV-2026-0101, order: SO-2026-0101, issue_date: 2026-11-03, due_date: 2026-12-03, status: open}
+  - {number: INV-2026-0102, order: SO-2026-0102, issue_date: 2026-10-28, due_date: 2026-11-27, status: paid, paid_date: 2026-11-10}
+  - {number: INV-2026-0103, order: SO-2026-0103, issue_date: 2026-10-06, due_date: 2026-11-05, status: paid, paid_date: 2026-10-30}
+  - {number: INV-2026-0104, order: SO-2026-0104, issue_date: 2026-11-10, due_date: 2026-12-10, status: open}
+  # Overdue by more than 60 days on the reference date.
+  - {number: INV-2026-0106, order: SO-2026-0106, issue_date: 2026-08-14, due_date: 2026-09-13, status: open}
+  - {number: INV-2026-0107, order: SO-2026-0107, issue_date: 2026-11-07, due_date: 2026-12-07, status: open}
+  - {number: INV-2026-0108, order: SO-2026-0108, issue_date: 2026-10-15, due_date: 2026-11-14, status: void}
+  - {number: INV-2026-0109, order: SO-2026-0109, issue_date: 2026-06-02, due_date: 2026-07-02, status: paid, paid_date: 2026-06-25}
+  - {number: INV-2026-0110, order: SO-2026-0110, issue_date: 2026-10-20, due_date: 2026-11-19, status: paid, paid_date: 2026-11-02}
+  - {number: INV-2026-0111, order: SO-2026-0111, issue_date: 2026-11-12, due_date: 2026-12-12, status: open}
+  # Overdue by a few days.
+  - {number: INV-2026-0112, order: SO-2026-0112, issue_date: 2026-10-09, due_date: 2026-11-08, status: open}
+
+# priority P1-P4 and first-response targets per tier come from NSI-SLA-CS-002 §4.
+tickets:
+  # Platinum P1 answered in 20 minutes: target (30 minutes) met.
+  - {number: T-5001, customer: C-1002, priority: P1, status: in_progress, subject: Compressor feeding the bottling line stopped, opened_at: "2026-11-14T08:00:00Z", first_response_at: "2026-11-14T08:20:00Z"}
+  # Standard P1 answered after 6.5 hours: target (4 hours) breached.
+  - {number: T-5002, customer: C-1003, order: SO-2026-0110, sku: NX-4400, priority: P1, status: in_progress, subject: Hydraulic pump seized on press line 2, opened_at: "2026-11-13T09:00:00Z", first_response_at: "2026-11-13T15:30:00Z"}
+  # Premium P2 answered in 3 hours: target (4 hours) met.
+  - {number: T-5003, customer: C-1001, order: SO-2026-0101, sku: CP-150S, priority: P2, status: in_progress, subject: Abnormal vibration on sanitary pump, opened_at: "2026-11-12T10:00:00Z", first_response_at: "2026-11-12T13:00:00Z"}
+  - {number: T-5004, customer: C-1007, order: SO-2026-0106, sku: CV-50E, priority: P3, status: resolved, subject: Actuator position alarm, opened_at: "2026-10-20T14:00:00Z", first_response_at: "2026-10-21T10:00:00Z", resolved_at: "2026-10-24T16:00:00Z"}
+  # Warranty question: NX-4400B delivered 2026-06-02, 36-month warranty.
+  - {number: T-5005, customer: C-1002, order: SO-2026-0109, sku: NX-4400B, priority: P2, status: open, subject: Shaft seal leak on marine pump, opened_at: "2026-11-14T11:00:00Z", first_response_at: "2026-11-14T12:30:00Z"}
+  - {number: T-5006, customer: C-1004, priority: P4, status: closed, subject: Request for compressor maintenance manual, opened_at: "2026-11-03T15:00:00Z", first_response_at: "2026-11-04T09:00:00Z", resolved_at: "2026-11-04T09:30:00Z"}
+  # No first response yet.
+  - {number: T-5007, customer: C-1005, priority: P2, status: open, subject: Servo motor overheating at full load, opened_at: "2026-11-14T16:00:00Z"}
+  # Return request 40 days after delivery: refused under the active policy (see SO-2026-0103).
+  - {number: T-5008, customer: C-1006, order: SO-2026-0103, sku: AC-110, priority: P4, status: open, subject: Request to return unused compressor, opened_at: "2026-11-15T09:00:00Z"}
+
+suppliers:
+  - {code: SUP-0007, name: Kestrel Fluid Systems Ltd., category: hydraulic pumps (OEM), country: GB, status: approved, risk_rating: low, annual_spend: 1240000, contract_doc_key: NSI-AGR-SUP-014}
+  - {code: SUP-0012, name: Brightline Electric Motors, category: servo motors, country: US, status: approved, risk_rating: low, annual_spend: 610000}
+  - {code: SUP-0019, name: Valvetech GmbH, category: control valves, country: DE, status: approved, risk_rating: medium, annual_spend: 455000}
+  # Onboarding not finished: purchase orders must not be issued yet.
+  - {code: SUP-0023, name: Coastal Castings LLC, category: pump housings, country: US, status: pending, risk_rating: medium, annual_spend: 0}
+  - {code: SUP-0031, name: Apex Freight Lines, category: freight, country: US, status: suspended, risk_rating: high, annual_spend: 98000}

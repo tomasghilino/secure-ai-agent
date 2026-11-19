@@ -62,7 +62,7 @@ async def test_an_upload_is_accepted_and_its_job_can_be_polled(
     assert response.status_code == 202
     job_id = response.json()["job_id"]
     assert response.json()["status"] == "queued"
-    assert [str(sent) for sent in queue.sent] == [job_id]
+    assert [str(sent) for sent in queue.sent_ids] == [job_id]
 
     job = await client.get(f"/v1/jobs/{job_id}", headers=AMER)
     assert job.status_code == 200

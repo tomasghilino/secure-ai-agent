@@ -1,8 +1,10 @@
 """Asynchronous ingestion: the API registers a job, the worker processes it.
 
-    API     validate -> already indexed? -> store the PDF -> insert job (queued) -> send {job_id}
-    worker  receive -> claim the job (running) -> read the PDF -> ingest_pdf
-            -> succeeded | failed -> delete the message
+    API      validate -> already indexed? -> store the PDF -> insert job (queued)
+             -> send {job_id, tenant_id}
+    worker   receive -> claim the job (running) -> read the PDF -> ingest_pdf
+             -> succeeded | failed -> delete the message
+    sweeper  re-send jobs whose message was lost; fail jobs nobody finished
 
 The API never extracts or embeds: an upload answers in milliseconds, and a slow or failing
 model cannot block it. Version conflicts are rejected *before* anything is queued, so no
@@ -14,16 +16,17 @@ from __future__ import annotations
 import hashlib
 import uuid
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Literal
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.models import DocumentRecord, IngestionJobRecord
 from app.ingestion.extraction import PdfValidationError
 from app.ingestion.pipeline import DocumentMetadata, IngestionError, ingest_pdf
-from app.ingestion.queue import JobQueue
+from app.ingestion.queue import JobQueue, JobRef
 from app.ingestion.storage import ObjectNotFoundError, ObjectStorage, upload_key
 from app.rag.embeddings import EmbeddingProvider
 
@@ -85,7 +88,7 @@ async def submit_document(
         # Same file uploaded again while its job waits: send the job again instead of
         # creating a second one. A duplicate message is harmless (the worker is
         # idempotent), and it rescues a job whose first message was lost.
-        await queue.send(pending.id)
+        await queue.send(JobRef(pending.id, metadata.tenant_id))
         return Submission("queued", job_id=pending.id)
     if documents or jobs:
         raise VersionConflictError(
@@ -110,7 +113,7 @@ async def submit_document(
         )
         session.add(job)
     try:
-        await queue.send(job.id)
+        await queue.send(JobRef(job.id, metadata.tenant_id))
     except Exception:
         # Committed but never sent: no worker would ever see it. (A crash right here still
         # leaves it waiting; uploading the same file again re-sends it.)
@@ -175,3 +178,58 @@ async def process_job(
     async with session.begin():
         job.status, job.error = "failed", error
     return job.status
+
+
+async def fail_job(session: AsyncSession, job_id: uuid.UUID, error: str) -> None:
+    """Mark a job failed, e.g. after its last delivery hit a transient error."""
+    async with session.begin():
+        await session.execute(
+            update(IngestionJobRecord)
+            .where(IngestionJobRecord.id == job_id, IngestionJobRecord.status.in_(IN_FLIGHT))
+            .values(status="failed", error=error)
+        )
+
+
+async def sweep_jobs(
+    session: AsyncSession,
+    queue: JobQueue,
+    *,
+    requeue_after: timedelta = timedelta(minutes=5),
+    abandon_after: timedelta = timedelta(minutes=15),
+) -> tuple[int, int]:
+    """Repair jobs that the normal flow left behind. Returns (re-sent, abandoned).
+
+    - ``queued`` for too long: its message was probably lost (the API crashed between the
+      commit and the send: a "dual write"). Send it again; a duplicate is harmless.
+    - ``running`` for too long: every delivery failed or the worker died, and the message
+      is in the dead-letter queue by now. Mark it failed so it does not look alive.
+
+    Uses a session *without* tenant: looking across tenants is its job. Each UPDATE
+    touches ``updated_at``, so two workers sweeping at once never pick the same job.
+    """
+    async with session.begin():
+        requeued = (
+            await session.execute(
+                update(IngestionJobRecord)
+                .where(
+                    IngestionJobRecord.status == "queued",
+                    IngestionJobRecord.updated_at < func.now() - requeue_after,
+                )
+                .values(updated_at=func.now())
+                .returning(IngestionJobRecord.id, IngestionJobRecord.tenant_id)
+            )
+        ).all()
+        abandoned = (
+            await session.execute(
+                update(IngestionJobRecord)
+                .where(
+                    IngestionJobRecord.status == "running",
+                    IngestionJobRecord.updated_at < func.now() - abandon_after,
+                )
+                .values(status="failed", error="abandoned: no worker finished it in time")
+                .returning(IngestionJobRecord.id)
+            )
+        ).all()
+    for job_id, tenant_id in requeued:
+        await queue.send(JobRef(job_id, tenant_id))
+    return len(requeued), len(abandoned)

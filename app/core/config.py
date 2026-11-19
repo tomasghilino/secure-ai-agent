@@ -66,6 +66,9 @@ class Settings(BaseSettings):
     # so a development machine never sends messages to AWS by accident.
     sqs_endpoint_url: str | None = None
     ingestion_queue_name: str = "northstar-ingestion"
+    # Must match the queue's maxReceiveCount (infra/elasticmq/elasticmq.conf, Terraform):
+    # on the last delivery a transient error fails the job instead of leaving it running.
+    ingestion_max_receives: int = Field(default=3, ge=1)
     max_upload_bytes: int = Field(default=20 * 1024 * 1024, ge=1)
 
     # --- Cost guardrails ---

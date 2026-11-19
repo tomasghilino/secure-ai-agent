@@ -1,13 +1,22 @@
+import asyncio
+import io
+import json
 import math
 from collections.abc import Sequence
 from types import SimpleNamespace
 from typing import Any
 
+import boto3
 import pytest
+from botocore import UNSIGNED
+from botocore.config import Config
+from botocore.response import StreamingBody
+from botocore.stub import Stubber
 
 from app.core.config import Settings
 from app.rag.embeddings import (
     QWEN3_QUERY_INSTRUCTION,
+    BedrockEmbeddings,
     EmbeddingError,
     FakeEmbeddings,
     OllamaEmbeddings,
@@ -109,3 +118,38 @@ def test_factory_builds_configured_provider(monkeypatch: pytest.MonkeyPatch) -> 
 
     assert provider.model_id == "ollama/qwen3-embedding:0.6b"
     assert provider.dimensions == 1024
+
+
+def _titan_response(vector: list[float]) -> dict[str, Any]:
+    raw = json.dumps({"embedding": vector, "inputTextTokenCount": 3}).encode()
+    return {"body": StreamingBody(io.BytesIO(raw), len(raw)), "contentType": "application/json"}
+
+
+async def test_titan_v2_sends_one_request_per_text_and_normalizes() -> None:
+    # Stubber: botocore checks every request against the real Bedrock API model and
+    # answers with canned responses. Nothing leaves the machine, nothing is billed.
+    client = boto3.client(
+        "bedrock-runtime", region_name="us-east-1", config=Config(signature_version=UNSIGNED)
+    )
+    embeddings = BedrockEmbeddings(
+        model_id="amazon.titan-embed-text-v2:0", dimensions=4, client=client
+    )
+    with Stubber(client) as stubber:
+        for text, vector in [("first", [3.0, 4.0, 0.0, 0.0]), ("second", [0.0, 0.0, 0.0, 2.0])]:
+            stubber.add_response(
+                "invoke_model",
+                _titan_response(vector),
+                {
+                    "modelId": "amazon.titan-embed-text-v2:0",
+                    "body": json.dumps({"inputText": text, "dimensions": 4, "normalize": True}),
+                    "contentType": "application/json",
+                    "accept": "application/json",
+                },
+            )
+        embeddings._limit = asyncio.Semaphore(1)  # keep the stubbed calls in order
+
+        vectors = await embeddings.embed_documents(["first", "second"])
+
+        stubber.assert_no_pending_responses()
+    assert vectors == [[0.6, 0.8, 0.0, 0.0], [0.0, 0.0, 0.0, 1.0]]
+    assert embeddings.model_id == "bedrock/amazon.titan-embed-text-v2:0"

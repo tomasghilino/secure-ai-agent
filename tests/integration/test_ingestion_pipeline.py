@@ -2,17 +2,20 @@
 
 import asyncio
 import hashlib
+from collections.abc import Sequence
+from dataclasses import replace
 from datetime import date
 
 import pytest
 from alembic import command
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.database.models import ChunkRecord, DocumentRecord
 from app.ingestion.pipeline import DocumentMetadata, IngestionResult, ingest_pdf
 from app.rag.embeddings import FakeEmbeddings
-from tests.integration.conftest import alembic_config
+from tests.conftest import GeneratedPdfs
+from tests.integration.conftest import RETURNS_V2_1, RETURNS_V3_0, alembic_config
 
 pytestmark = pytest.mark.integration
 
@@ -94,3 +97,81 @@ async def test_two_workers_with_the_same_file_store_it_once(
     assert loser.document_id is None  # stopped by ON CONFLICT, not by the cheap check
     async with sessions() as session:
         assert await _count_chunks(session) == 10
+
+
+class CountingEmbeddings(FakeEmbeddings):
+    """Fake embeddings that count how many texts were actually sent to the model."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.embedded = 0
+
+    async def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
+        self.embedded += len(texts)
+        return await super().embed_documents(texts)
+
+
+async def _statuses(session: AsyncSession, doc_key: str) -> dict[str, str]:
+    async with session.begin():
+        rows = await session.execute(
+            select(DocumentRecord.version, DocumentRecord.status).where(
+                DocumentRecord.doc_key == doc_key
+            )
+        )
+        return {version: status for version, status in rows}
+
+
+async def test_a_new_active_version_supersedes_the_previous_one(
+    session: AsyncSession, generated_pdfs: GeneratedPdfs
+) -> None:
+    old_metadata, old_pdf = generated_pdfs[RETURNS_V2_1]
+    new_metadata, new_pdf = generated_pdfs[RETURNS_V3_0]
+    # v2.1 arrives first, still believed active (as it was before v3.0 existed).
+    await ingest_pdf(session, old_pdf, replace(old_metadata, status="active"), FakeEmbeddings())
+
+    result = await ingest_pdf(session, new_pdf, new_metadata, FakeEmbeddings())
+
+    assert result.status == "active"
+    assert await _statuses(session, "NSI-POL-RET-003") == {"2.1": "superseded", "3.0": "active"}
+
+
+async def test_an_older_version_arriving_late_is_stored_as_superseded(
+    session: AsyncSession, generated_pdfs: GeneratedPdfs
+) -> None:
+    old_metadata, old_pdf = generated_pdfs[RETURNS_V2_1]
+    new_metadata, new_pdf = generated_pdfs[RETURNS_V3_0]
+    await ingest_pdf(session, new_pdf, new_metadata, FakeEmbeddings())
+
+    result = await ingest_pdf(
+        session, old_pdf, replace(old_metadata, status="active"), FakeEmbeddings()
+    )
+
+    assert result.status == "superseded"  # v3.0 has a later effective date: it stays active
+    assert await _statuses(session, "NSI-POL-RET-003") == {"2.1": "superseded", "3.0": "active"}
+
+
+async def test_a_duplicate_upload_does_not_supersede_anything(
+    sessions: async_sessionmaker[AsyncSession], returns_policy_pdf: bytes
+) -> None:
+    async def worker() -> IngestionResult:
+        async with sessions() as session:
+            return await ingest_pdf(session, returns_policy_pdf, RETURNS_POLICY, FakeEmbeddings())
+
+    await asyncio.gather(worker(), worker())  # the loser's transaction must roll back
+
+    async with sessions() as session:
+        assert await _statuses(session, "NSI-POL-RET-003") == {"3.0": "active"}
+
+
+async def test_unchanged_text_is_not_embedded_again(
+    session: AsyncSession, returns_policy_pdf: bytes
+) -> None:
+    first = await ingest_pdf(session, returns_policy_pdf, RETURNS_POLICY, FakeEmbeddings())
+    async with session.begin():
+        await session.execute(delete(DocumentRecord))  # e.g. re-indexing from scratch
+    counting = CountingEmbeddings()
+
+    again = await ingest_pdf(session, returns_policy_pdf, RETURNS_POLICY, counting)
+
+    assert again.cache_hits == again.chunk_count == first.chunk_count
+    assert counting.embedded == 0  # every vector came from the cache: nothing to pay

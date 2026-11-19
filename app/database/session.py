@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
+from app.database import tenancy  # noqa: F401  (registers the tenant-context event hook)
+
 
 def build_engine(database_url: str) -> AsyncEngine:
     # pool_pre_ping replaces connections the server closed (restarts, idle timeouts).

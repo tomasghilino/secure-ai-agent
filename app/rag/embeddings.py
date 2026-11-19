@@ -7,7 +7,7 @@ bounded by the embedding model, so the provider is an explicit, swappable depend
 - ``FakeEmbeddings``   deterministic feature hashing (bag of words). Free and reproducible,
   it only captures shared words: good for tests, meaningless for quality benchmarks.
 - ``OllamaEmbeddings`` local open-weight model (Qwen3-Embedding) on the developer's GPU.
-- Bedrock Titan V2 is added together with the AWS adapters (same interface).
+- ``BedrockEmbeddings`` Amazon Titan Text Embeddings V2 (staging; costs money).
 
 Documents and queries go through different methods because some models are
 *asymmetric*: Qwen3-Embedding expects a task instruction in front of queries only.
@@ -17,15 +17,21 @@ All providers return L2-normalized vectors, so cosine similarity equals the dot 
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import json
 import math
 import re
 from collections.abc import Sequence
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
+import boto3
 from ollama import AsyncClient
 
 from app.core.config import Settings
+
+if TYPE_CHECKING:
+    from types_boto3_bedrock_runtime.client import BedrockRuntimeClient
 
 Vector = list[float]
 
@@ -160,6 +166,58 @@ class OllamaEmbeddings:
         return (await self._embed_batch([text]))[0]
 
 
+class BedrockEmbeddings:
+    """Amazon Titan Text Embeddings V2 through Bedrock ``InvokeModel``.
+
+    Titan V2 embeds one text per call, so a batch becomes several calls in parallel,
+    capped by ``max_concurrency`` to stay under the account's requests-per-minute quota.
+    It is symmetric: queries and documents are embedded the same way. boto3 is
+    synchronous, so each call runs in a worker thread.
+    """
+
+    def __init__(
+        self,
+        *,
+        model_id: str,
+        dimensions: int,
+        client: BedrockRuntimeClient,
+        max_concurrency: int = 4,
+    ) -> None:
+        self._model_id = model_id
+        self._dimensions = dimensions
+        self._client = client
+        self._limit = asyncio.Semaphore(max_concurrency)
+
+    @property
+    def model_id(self) -> str:
+        return f"bedrock/{self._model_id}"
+
+    @property
+    def dimensions(self) -> int:
+        return self._dimensions
+
+    async def _embed(self, text: str) -> Vector:
+        body = json.dumps({"inputText": text, "dimensions": self._dimensions, "normalize": True})
+        async with self._limit:
+            response = await asyncio.to_thread(
+                self._client.invoke_model,
+                modelId=self._model_id,
+                body=body,
+                contentType="application/json",
+                accept="application/json",
+            )
+        vector: list[float] = json.loads(response["body"].read())["embedding"]
+        if len(vector) != self._dimensions:
+            raise EmbeddingError(f"{self._model_id} did not return {self._dimensions}-d vectors")
+        return l2_normalize(vector)
+
+    async def embed_documents(self, texts: Sequence[str]) -> list[Vector]:
+        return list(await asyncio.gather(*(self._embed(text) for text in texts)))
+
+    async def embed_query(self, text: str) -> Vector:
+        return await self._embed(text)
+
+
 def build_embedding_provider(settings: Settings) -> EmbeddingProvider:
     """Composition root for embeddings: the only place that knows concrete classes."""
     match settings.embedding_provider:
@@ -174,4 +232,12 @@ def build_embedding_provider(settings: Settings) -> EmbeddingProvider:
                 query_instruction=QWEN3_QUERY_INSTRUCTION if "qwen3-embedding" in model else None,
             )
         case "bedrock":
-            raise NotImplementedError("Bedrock Titan V2 embeddings arrive with the AWS adapters")
+            # Credentials from the standard AWS chain: SSO profile locally, IAM role on ECS.
+            session = boto3.session.Session(
+                profile_name=settings.aws_profile, region_name=settings.aws_region
+            )
+            return BedrockEmbeddings(
+                model_id=settings.bedrock_embedding_model_id,
+                dimensions=settings.embedding_dimensions,
+                client=session.client("bedrock-runtime"),
+            )

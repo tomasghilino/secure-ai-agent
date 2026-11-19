@@ -1,13 +1,16 @@
 """The ingestion job queue: the SQS API, served by ElasticMQ locally (ADR-0003).
 
-Messages only carry a job id; the job itself lives in PostgreSQL. SQS delivers each
-message *at least once*, so whoever processes it must tolerate duplicates.
+Messages only carry a job reference (job id + tenant); the job itself lives in
+PostgreSQL. The worker processes each job under that tenant (Row-Level Security), so a
+message naming the wrong tenant finds no job. SQS delivers each message *at least once*,
+so whoever processes it must tolerate duplicates.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
+import re
 import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
@@ -23,30 +26,43 @@ if TYPE_CHECKING:
     from types_boto3_sqs.client import SQSClient
 
 
+_TENANT_ID = re.compile(r"^[a-z0-9-]{1,64}$")
+
+
+@dataclass(frozen=True, slots=True)
+class JobRef:
+    job_id: uuid.UUID
+    tenant_id: str
+
+
 @dataclass(frozen=True, slots=True)
 class QueueMessage:
-    job_id: uuid.UUID | None  # None when the body is not a valid job message
+    job: JobRef | None  # None when the body is not a valid job message
     receipt_handle: str  # needed to delete this delivery of the message
     receive_count: int  # 1 on the first delivery; grows with every retry
 
 
 class JobQueue(Protocol):
-    async def send(self, job_id: uuid.UUID) -> None: ...
+    async def send(self, job: JobRef) -> None: ...
 
     async def receive(self) -> list[QueueMessage]: ...
 
     async def delete(self, message: QueueMessage) -> None: ...
 
 
-def encode_job(job_id: uuid.UUID) -> str:
-    return json.dumps({"job_id": str(job_id)})
+def encode_job(job: JobRef) -> str:
+    return json.dumps({"job_id": str(job.job_id), "tenant_id": job.tenant_id})
 
 
-def decode_job(body: str) -> uuid.UUID | None:
+def decode_job(body: str) -> JobRef | None:
     try:
-        return uuid.UUID(json.loads(body)["job_id"])
+        payload = json.loads(body)
+        job_id, tenant_id = uuid.UUID(payload["job_id"]), payload["tenant_id"]
     except (ValueError, TypeError, KeyError):
         return None
+    if not isinstance(tenant_id, str) or not _TENANT_ID.match(tenant_id):
+        return None
+    return JobRef(job_id, tenant_id)
 
 
 class SqsJobQueue:
@@ -67,9 +83,9 @@ class SqsJobQueue:
             self._queue_url = response["QueueUrl"]
         return self._queue_url
 
-    async def send(self, job_id: uuid.UUID) -> None:
+    async def send(self, job: JobRef) -> None:
         await asyncio.to_thread(
-            self._client.send_message, QueueUrl=await self._url(), MessageBody=encode_job(job_id)
+            self._client.send_message, QueueUrl=await self._url(), MessageBody=encode_job(job)
         )
 
     async def receive(self) -> list[QueueMessage]:
@@ -83,7 +99,7 @@ class SqsJobQueue:
         )
         return [
             QueueMessage(
-                job_id=decode_job(message["Body"]),
+                job=decode_job(message["Body"]),
                 receipt_handle=message["ReceiptHandle"],
                 receive_count=int(message["Attributes"]["ApproximateReceiveCount"]),
             )

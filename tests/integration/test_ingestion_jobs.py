@@ -35,7 +35,7 @@ async def test_an_upload_stores_the_pdf_and_queues_a_job(
     submission = await submit_document(session, storage, queue, pdf, metadata)
 
     assert submission.status == "queued"
-    assert queue.sent == [submission.job_id]
+    assert queue.sent_ids == [submission.job_id]
     job = await session.get_one(IngestionJobRecord, submission.job_id)
     assert (job.status, job.attempts, job.doc_key, job.version) == (
         "queued",
@@ -59,7 +59,7 @@ async def test_the_same_file_twice_reuses_the_waiting_job(
     second = await submit_document(session, storage, queue, pdf, metadata)
 
     assert second.job_id == first.job_id
-    assert queue.sent == [first.job_id, first.job_id]  # sent again, not a second job
+    assert queue.sent_ids == [first.job_id, first.job_id]  # sent again, not a second job
     assert await _count(session, IngestionJobRecord) == 1
 
 

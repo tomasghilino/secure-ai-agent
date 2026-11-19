@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.core.config import Settings
 from app.database.session import build_engine, build_session_factory
 from app.ingestion.pipeline import ingest_pdf
-from app.ingestion.queue import QueueMessage
+from app.ingestion.queue import JobRef, QueueMessage
 from app.ingestion.storage import LocalFileStorage
 from app.rag.embeddings import FakeEmbeddings
 from tests.conftest import GeneratedPdfs
@@ -72,7 +72,9 @@ async def sessions(database_url: str) -> AsyncIterator[async_sessionmaker[AsyncS
     """Session factory on empty tables: every test starts from scratch."""
     engine = build_engine(database_url)
     async with engine.begin() as connection:
-        await connection.execute(text("TRUNCATE documents CASCADE"))
+        await connection.execute(
+            text("TRUNCATE documents, embedding_cache, products, customers, suppliers CASCADE")
+        )
     yield build_session_factory(engine)
     await engine.dispose()
 
@@ -95,19 +97,21 @@ async def session_with_returns_policies(
 
 
 class InMemoryJobQueue:
-    """JobQueue test double: keeps sent job ids in a list (no SQS semantics)."""
+    """JobQueue test double: keeps sent job references in a list (no SQS semantics)."""
 
     def __init__(self) -> None:
-        self.sent: list[uuid.UUID] = []
+        self.sent: list[JobRef] = []
         self.deleted: list[QueueMessage] = []
 
-    async def send(self, job_id: uuid.UUID) -> None:
-        self.sent.append(job_id)
+    @property
+    def sent_ids(self) -> list[uuid.UUID]:
+        return [job.job_id for job in self.sent]
+
+    async def send(self, job: JobRef) -> None:
+        self.sent.append(job)
 
     async def receive(self) -> list[QueueMessage]:
-        messages = [
-            QueueMessage(job_id, str(i), receive_count=1) for i, job_id in enumerate(self.sent)
-        ]
+        messages = [QueueMessage(job, str(i), receive_count=1) for i, job in enumerate(self.sent)]
         self.sent = []
         return messages
 
