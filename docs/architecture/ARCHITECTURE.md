@@ -69,11 +69,13 @@ sequenceDiagram
 
     C->>A: POST /documents (PDF + metadata)
     A->>A: validate size, MIME, PDF magic bytes, sha256
-    A->>P: upsert document (tenant, doc_key, version, sha256)
+    A->>P: look up (tenant, sha256) and (tenant, doc_key, version)
     alt same sha256 already indexed
         A-->>C: 200 already_indexed (idempotent no-op)
+    else same doc_key + version with a different file
+        A-->>C: 409 Conflict (nothing queued, nothing embedded)
     else new document or new version
-        A->>S: put object (tenant/doc_key/version.pdf)
+        A->>S: put object (uploads/tenant/sha256.pdf)
         A->>P: insert ingestion_job (queued)
         A->>Q: send {job_id}
         A-->>C: 202 Accepted {job_id}
