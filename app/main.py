@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI
 
 from app import __version__
+from app.agents.checkpointer import open_checkpointer
+from app.agents.models import build_agent_model
+from app.agents.service import AgentService
+from app.api.agent import router as agent_router
 from app.api.ask import router as ask_router
 from app.api.documents import router as documents_router
 from app.api.health import router as health_router
@@ -33,6 +37,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.storage = build_storage(settings)
     app.state.job_queue = build_job_queue(settings)
     app.state.chat_model = build_chat_model(settings)
+    exit_stack = AsyncExitStack()
+    # Agent state (checkpoints) gets its own small connection pool (psycopg, autocommit).
+    checkpointer = await exit_stack.enter_async_context(open_checkpointer(settings.database_url))
+    app.state.agent_service = AgentService(
+        sessions=app.state.session_factory,
+        embeddings=app.state.embeddings,
+        model=build_agent_model(settings),
+        checkpointer=checkpointer,
+        settings=settings,
+    )
     log.info(
         "app.startup",
         environment=settings.app_env,
@@ -40,6 +54,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         embedding_provider=settings.embedding_provider,
     )
     yield
+    await exit_stack.aclose()
     await engine.dispose()  # close the pooled connections
     log.info("app.shutdown")
 
@@ -56,6 +71,7 @@ def create_app() -> FastAPI:
     app.include_router(search_router)
     app.include_router(documents_router)
     app.include_router(ask_router)
+    app.include_router(agent_router)
     return app
 
 

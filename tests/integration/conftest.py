@@ -73,7 +73,10 @@ async def sessions(database_url: str) -> AsyncIterator[async_sessionmaker[AsyncS
     engine = build_engine(database_url)
     async with engine.begin() as connection:
         await connection.execute(
-            text("TRUNCATE documents, embedding_cache, products, customers, suppliers CASCADE")
+            text(
+                "TRUNCATE documents, embedding_cache, products, customers, suppliers,"
+                " agent_threads, audit_events CASCADE"
+            )
         )
     yield build_session_factory(engine)
     await engine.dispose()

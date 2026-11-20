@@ -19,8 +19,11 @@ from app.database.tenancy import tenant_session
 from app.ingestion.queue import JobQueue
 from app.ingestion.storage import ObjectStorage
 from app.rag.embeddings import EmbeddingProvider
+from app.tools.authorization import Principal, Role
 
 TENANT_HEADER = "X-Tenant-ID"
+USER_HEADER = "X-User-ID"
+ROLE_HEADER = "X-User-Role"
 
 
 def get_tenant_id(
@@ -39,6 +42,25 @@ def get_tenant_id(
     if x_tenant_id is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, f"missing {TENANT_HEADER} header")
     return x_tenant_id
+
+
+def get_principal(
+    tenant_id: Annotated[str, Depends(get_tenant_id)],
+    x_user_id: Annotated[str | None, Header(pattern=r"^[A-Za-z0-9._@-]{1,64}$")] = None,
+    x_user_role: Annotated[Role | None, Header()] = None,
+) -> Principal:
+    """Who is calling: tenant, user and role (agent endpoints).
+
+    Same development stand-in as the tenant (only accepted in local/test, enforced by
+    ``get_tenant_id``): Day 4 reads all three from a verified JWT. A role sent by the
+    client is exactly what a real system must never trust; it is acceptable here only
+    because these headers do not work outside local and test.
+    """
+    if x_user_id is None or x_user_role is None:
+        raise HTTPException(
+            status.HTTP_401_UNAUTHORIZED, f"missing {USER_HEADER} or {ROLE_HEADER} header"
+        )
+    return Principal(tenant_id, x_user_id, x_user_role)
 
 
 async def get_session(
@@ -71,6 +93,7 @@ def get_job_queue(request: Request) -> JobQueue:
 
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 TenantDep = Annotated[str, Depends(get_tenant_id)]
+PrincipalDep = Annotated[Principal, Depends(get_principal)]
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 EmbeddingsDep = Annotated[EmbeddingProvider, Depends(get_embeddings)]
 StorageDep = Annotated[ObjectStorage, Depends(get_storage)]

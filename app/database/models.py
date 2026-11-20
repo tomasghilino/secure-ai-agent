@@ -41,7 +41,7 @@ from sqlalchemy import (
     func,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, TSVECTOR
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 # Changing this needs a migration AND re-embedding every chunk (the vectors of different
@@ -332,3 +332,94 @@ class SupplierRecord(Base):
     annual_spend: Mapped[Decimal] = mapped_column(Money)
     currency: Mapped[str]
     contract_doc_key: Mapped[str | None]  # e.g. NSI-AGR-SUP-014
+
+
+# --------------------------------------------------------------------------- agent (Day 3)
+
+
+class AgentThreadRecord(Base):
+    """One agent conversation: who started it and where it stands.
+
+    The conversation itself (messages, tool results) lives in LangGraph's checkpoint
+    tables, in the separate ``agent_checkpoints`` schema. This row is the tenant-scoped
+    handle to it: the API checks ownership here (RLS) before touching the checkpoint.
+    """
+
+    __tablename__ = "agent_threads"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('running', 'awaiting_approval', 'completed', 'stopped', 'failed')",
+            name="status",
+        ),
+        Index("ix_agent_threads_tenant_id_status", "tenant_id", "status"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True)  # = LangGraph thread_id
+    tenant_id: Mapped[str]
+    # The agent always acts as this identity, also after a supervisor approves an action.
+    created_by: Mapped[str]
+    created_by_role: Mapped[str]
+    title: Mapped[str]  # first message, truncated
+    status: Mapped[str]
+    # The action waiting for a decision, with the facts the approver needs.
+    pending_action: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class AuditEventRecord(Base):
+    """Append-only record of what the agent and its users did.
+
+    The application role may INSERT and SELECT but not UPDATE or DELETE (see the
+    migration): a compromised request cannot rewrite history. Arguments are stored,
+    truncated; tool *results* never are (they hold business data).
+    """
+
+    __tablename__ = "audit_events"
+    __table_args__ = (
+        CheckConstraint(
+            "event_type IN ('tool_call', 'action_proposed', 'action_decided', "
+            "'action_executed', 'run_stopped')",
+            name="event_type",
+        ),
+        Index("ix_audit_events_tenant_id_occurred_at", "tenant_id", "occurred_at"),
+        Index("ix_audit_events_thread_id", "thread_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, server_default=func.gen_random_uuid())
+    tenant_id: Mapped[str]
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    actor_id: Mapped[str]
+    actor_role: Mapped[str]
+    thread_id: Mapped[uuid.UUID | None]
+    event_type: Mapped[str]
+    tool_name: Mapped[str | None]
+    arguments: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    outcome: Mapped[str]  # ok | denied | error | approved | rejected | proposed | ...
+    detail: Mapped[str | None]
+
+
+class ReturnAuthorizationRecord(Base):
+    """A return authorization (RMA): the only write the agent can lead to, after approval."""
+
+    __tablename__ = "return_authorizations"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "rma_number"),
+        UniqueConstraint("tenant_id", "order_id"),  # one RMA per order: approvals are idempotent
+        # Separation of duties, enforced by the database too: nobody approves their own request.
+        CheckConstraint("approved_by <> requested_by", name="approver_is_not_requester"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, server_default=func.gen_random_uuid())
+    tenant_id: Mapped[str]
+    rma_number: Mapped[str]
+    order_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("orders.id"))
+    reason: Mapped[str]
+    requested_by: Mapped[str]
+    approved_by: Mapped[str]
+    thread_id: Mapped[uuid.UUID | None]
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

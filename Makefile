@@ -3,10 +3,14 @@
 # Windows (cmd.exe). Run `make help` to list targets.
 
 .DEFAULT_GOAL := help
-.PHONY: help setup data dev up down migrate migration seed ingest worker search ask eval-retrieval eval-answers llm-up llm-pull test test-integration test-llm lint format typecheck check
+.PHONY: help setup data dev up down migrate migration seed ingest worker search ask agent approve mcp eval-retrieval eval-answers llm-up llm-pull test test-integration test-llm lint format typecheck check
 
 OLLAMA_CHAT_MODEL ?= qwen3:8b
 OLLAMA_EMBEDDING_MODEL ?= qwen3-embedding:0.6b
+# Development identity for `make agent` / `make mcp` (Day 4 replaces it with JWT logins).
+tenant ?= nsi-amer
+role ?= support_agent
+user ?= agent-1
 
 help: ## List available commands
 	@uv run --no-project --quiet python scripts/make_help.py Makefile
@@ -47,6 +51,15 @@ search: ## Hybrid search over the ingested chunks: make search q="your question"
 
 ask: ## Answer a question with citations (RAG): make ask q="your question"
 	uv run python -m scripts.ask "$(q)"
+
+agent: ## Ask the operations agent: make agent q="..." [role=finance_analyst user=fin-1]
+	uv run python -m scripts.agent "$(q)" --tenant $(tenant) --role $(role) --user $(user)
+
+approve: ## Decide a pending agent action as supervisor sup-1: make approve t=<thread> [reject=1]
+	uv run python -m scripts.agent --decide $(t) --tenant $(tenant) --role supervisor --user sup-1 $(if $(reject),--reject,)
+
+mcp: ## Run the read-only MCP server on stdio: make mcp [tenant=... role=...] (for MCP clients)
+	uv run python -m app.mcp_server --tenant $(tenant) --role $(role) --user $(user)
 
 eval-retrieval: ## Retrieval metrics (dense vs keyword vs hybrid) on data/evaluation; free
 	uv run python -m scripts.evaluate_retrieval

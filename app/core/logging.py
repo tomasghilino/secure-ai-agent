@@ -12,12 +12,15 @@ from __future__ import annotations
 
 import logging
 import sys
-from typing import Any
+from typing import Any, TextIO
 
 import structlog
 
 
-def configure_logging(level: str = "INFO", fmt: str = "console") -> None:
+def configure_logging(
+    level: str = "INFO", fmt: str = "console", stream: TextIO | None = None
+) -> None:
+    """``stream`` defaults to stdout; the MCP server passes stderr (stdout carries the protocol)."""
     shared: list[Any] = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
@@ -34,7 +37,7 @@ def configure_logging(level: str = "INFO", fmt: str = "console") -> None:
         wrapper_class=structlog.make_filtering_bound_logger(
             logging.getLevelNamesMapping()[level.upper()]
         ),
-        logger_factory=structlog.PrintLoggerFactory(sys.stdout),
+        logger_factory=structlog.PrintLoggerFactory(stream or sys.stdout),
         cache_logger_on_first_use=True,
     )
 

@@ -8,6 +8,7 @@ time, so the chat model must be set explicitly once it has been verified.
 
 from __future__ import annotations
 
+from datetime import date
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -84,6 +85,29 @@ class Settings(BaseSettings):
 
     # --- Cost guardrails ---
     llm_max_output_tokens: int = Field(default=800, ge=64, le=4096)
+
+    # --- Agent (Day 3) ---
+    # Kill switch: false makes every agent endpoint answer 503 without calling the model.
+    agent_enabled: bool = True
+    # Bounded loop: model calls per user message, tool calls per model turn, tool result
+    # size sent back to the model. Each limit caps tokens, latency and runaway behaviour.
+    agent_max_steps: int = Field(default=6, ge=1, le=20)
+    agent_max_tool_calls_per_step: int = Field(default=4, ge=1, le=10)
+    agent_tool_result_max_chars: int = Field(default=4000, ge=500, le=20000)
+    # local: tools run in-process; mcp: through the read-only MCP server (stdio subprocess).
+    agent_tool_transport: Literal["local", "mcp"] = "local"
+    # "Today" for the agent and its tools. Unset = the real date; the seeded business data
+    # is written against 2026-11-15, so demos and evaluations pin it.
+    agent_reference_date: date | None = None
+    # Local model thinking for the agent (overrides LLM_REASONING). Measured: without it
+    # Qwen3 8B read "days_since_delivery: 40" as inside a 30-day window; with it, correct.
+    agent_reasoning: bool = True
+
+    # --- MCP server (`make mcp`): the one identity every tool call runs as ---
+    # Fixed at launch, never taken from the model or the client (no confused deputy).
+    mcp_tenant_id: str | None = Field(default=None, pattern=r"^[a-z0-9-]{1,64}$")
+    mcp_user_id: str = Field(default="mcp-client", pattern=r"^[A-Za-z0-9._@-]{1,64}$")
+    mcp_role: Literal["support_agent", "finance_analyst", "supervisor"] | None = None
 
     @field_validator("embedding_dimensions")
     @classmethod
