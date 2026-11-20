@@ -4,7 +4,7 @@ An enterprise AI assistant for a (fictional) industrial equipment distributor: i
 questions grounded in company documents with verifiable citations, queries business data
 through safe, predefined tools, and prepares sensitive actions for human approval.
 
-> **Status: work in progress (Days 1 and 2 of 4 done).** See the
+> **Status: work in progress (Days 1–3 of 4 done).** See the
 > [delivery plan](docs/PROJECT_PLAN.md) and the [architecture](docs/architecture/ARCHITECTURE.md).
 
 ## Capabilities
@@ -19,11 +19,16 @@ Done:
 - Multi-tenancy enforced twice: tenant filters and PostgreSQL Row-Level Security
 - Evaluation on a labelled set of 47 questions: retrieval metrics and answer checks
   ([results](docs/benchmarks/2026-11-19-rag-local.md))
+- LangGraph operations agent over 8 read-only tools, with a bounded loop and human approval
+  (interrupt/resume, PostgreSQL checkpointer) for the one write it can lead to
+- Role × tool authorization, separation of duties and an append-only audit log
+- Read-only MCP server (stdio) usable from any MCP client; the agent's MCP client pins tools
+- Security by design: [threat model](docs/security/THREAT_MODEL.md) mapped to the OWASP Top 10
+  for LLM, agentic and MCP applications
 
 Planned:
-- LangGraph agent with bounded tool use, MCP-served business tools and human approval
-- Authentication (JWT) and roles, tracing and cost tracking
-- Terraform for an ephemeral AWS staging on Amazon Bedrock
+- Authentication (JWT) and roles from claims, rate limits, AI red-team evaluation
+- CI with security scanning; Terraform for an ephemeral AWS staging on Amazon Bedrock
 
 ## Local quick start
 
@@ -54,11 +59,25 @@ make search q="how many days do I have to return a product?"
 make ask q="how many days do I have to return a product?"   # answer with citations
 make eval-retrieval   # dense vs keyword vs hybrid on the evaluation set
 make eval-answers     # answered / refused / cited the right section
+
+# The operations agent (thinking on; AGENT_REFERENCE_DATE=2026-11-15 matches the data)
+make agent q="Customer C-1006 asks to return SO-2026-0103. Is it allowed?"
+make agent q="Please create a return authorization for SO-2026-0101, wrong size."
+make approve t=<thread_id>          # as supervisor sup-1 (add reject=1 to reject)
+make agent q="Which invoices are overdue?" role=finance_analyst user=fin-1
+```
+
+Use the read-only MCP server from Claude Code (or any MCP client):
+
+```bash
+claude mcp add northstar -- uv run --directory /path/to/repo python -m app.mcp_server --tenant nsi-amer --role support_agent
 ```
 
 The API (Swagger at http://localhost:8000/docs) exposes `POST /v1/documents` (upload),
-`GET /v1/jobs/{id}`, `POST /v1/search` and `POST /v1/ask`. Until authentication arrives,
-the tenant comes from the dev-only `X-Tenant-ID` header.
+`GET /v1/jobs/{id}`, `POST /v1/search`, `POST /v1/ask` and the agent endpoints
+(`/v1/agent/threads`, `/v1/agent/approvals`, `/v1/audit-events`). Until authentication
+arrives, identity comes from dev-only headers (`X-Tenant-ID`, `X-User-ID`, `X-User-Role`),
+rejected outside local and test.
 
 `make help` lists every command.
 
@@ -66,4 +85,5 @@ the tenant comes from the dev-only `X-Tenant-ID` header.
 
 - [Architecture](docs/architecture/ARCHITECTURE.md)
 - [Architecture Decision Records](docs/adr)
+- [Threat model and security roadmap](docs/security/THREAT_MODEL.md)
 - [Delivery plan](docs/PROJECT_PLAN.md)

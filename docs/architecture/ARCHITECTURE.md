@@ -124,30 +124,33 @@ flowchart TD
 Every stage is a separate, testable component (`app/rag/*`). Retrieval is evaluated
 **independently** of generation (recall@k / precision@k / MRR on a labelled dataset).
 
-## 5. Agent orchestration (Day 3)
+## 5. Agent orchestration (Day 3, built)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> guard_input
-    guard_input --> agent
-    agent --> tools: tool_calls and steps < max_steps
-    agent --> finalize: final answer / clarification / budget exhausted
-    tools --> approval: sensitive tool (e.g. draft_customer_response)
-    tools --> agent: read-only tool results
-    approval --> agent: approved / rejected (resume after interrupt)
-    finalize --> [*]
+    [*] --> agent
+    agent --> tools: tool calls and steps < max_steps
+    agent --> step_limit: tool calls and steps = max_steps
+    agent --> [*]: final answer
+    tools --> agent: read-only results
+    tools --> approval: request_return_authorization (pending action)
+    approval --> agent: approved (RMA created) / rejected
+    step_limit --> [*]
 ```
 
-- **Explicit state** (`messages`, `tenant`, `roles`, `step_count`, `tool_calls_made`,
-  `citations`, `pending_action`, `usage`).
-- **Bounded loop**: `max_steps`, `max_tool_calls`, LangGraph `recursion_limit`,
-  per-request token budget.
-- **Tool authorization** happens in code before execution (role × tool matrix), not in
-  the prompt.
-- **Human-in-the-loop**: LangGraph `interrupt()` + PostgreSQL checkpointer; the API
-  exposes approve/reject endpoints that resume the thread.
-- **MCP**: read-only business tools live in a separate MCP server process and are
-  discovered at runtime through `langchain-mcp-adapters`.
+- **State**: `messages`, `steps`, `pending_action`, `stop_reason`, saved after every step
+  by the PostgreSQL checkpointer (schema `agent_checkpoints`) under the thread id.
+- **Identity**: the requester's tenant, user and role come from the request and live
+  outside the state; the run resumes as the requester after approval.
+- **Bounded loop**: `AGENT_MAX_STEPS`, `AGENT_MAX_TOOL_CALLS_PER_STEP`,
+  `AGENT_TOOL_RESULT_MAX_CHARS`, LangGraph `recursion_limit`.
+- **Tool authorization** in code (role × tool, deny by default), re-checked on every call;
+  RLS underneath. Every call and decision lands in the append-only `audit_events`.
+- **Human-in-the-loop**: `interrupt()` in the approval node; `POST
+  /v1/agent/threads/{id}/decision` (supervisor, not the requester) resumes it.
+- **MCP**: the same read-only tools behind an MCP server over stdio (`python -m
+  app.mcp_server`); with `AGENT_TOOL_TRANSPORT=mcp` the agent starts it as a subprocess
+  and accepts only tools whose hash matches the reviewed catalog (ADR-0008).
 
 ## 6. Data model (preliminary)
 
