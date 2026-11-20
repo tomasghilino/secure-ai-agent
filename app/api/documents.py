@@ -77,7 +77,7 @@ async def upload_document(
     response: Response,
 ) -> UploadResponse:
     # Read at most one byte over the limit, so memory stays bounded. The request body is
-    # already spooled to disk by now: a hard limit belongs in the load balancer too (Day 4).
+    # already spooled to disk by now: a hard limit belongs in the load balancer too.
     data = await form.file.read(settings.max_upload_bytes + 1)
     if len(data) > settings.max_upload_bytes:
         raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, "the file is too large")

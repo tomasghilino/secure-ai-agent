@@ -13,8 +13,6 @@
   process. The node re-runs from its start on resume, so nothing before ``interrupt``
   may have side effects.
 - ``step_limit``: the loop is bounded; the run stops instead of spinning (OWASP LLM10).
-
-≈ a state machine in NestJS (a saga or XState) whose state is persisted after every step.
 """
 
 from __future__ import annotations

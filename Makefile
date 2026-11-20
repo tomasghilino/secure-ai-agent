@@ -7,7 +7,7 @@
 
 OLLAMA_CHAT_MODEL ?= qwen3:8b
 OLLAMA_EMBEDDING_MODEL ?= qwen3-embedding:0.6b
-# Development identity for `make agent` / `make mcp` (Day 4 replaces it with JWT logins).
+# Development identity for `make agent` / `make mcp` (to be replaced by JWT authentication).
 tenant ?= nsi-amer
 role ?= support_agent
 user ?= agent-1

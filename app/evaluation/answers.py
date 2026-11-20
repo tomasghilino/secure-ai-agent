@@ -1,6 +1,6 @@
 """Answer checks: does the assistant answer when it should, refuse when it should, and
 cite the right section? Deterministic checks only; judging wording with a model (Ragas
-faithfulness / relevance) is a separate, paid step (Day 4).
+faithfulness / relevance) is a separate, paid step.
 
 Per question:
 - answerable   answered? cited a relevant section? cited a forbidden version?

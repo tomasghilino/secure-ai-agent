@@ -9,8 +9,7 @@ upload the same file twice:
    before the expensive work (extraction, embedding calls).
 2. **The database has the final word.** Two workers can pass the check at the same
    moment, so the insert uses ``ON CONFLICT (tenant_id, sha256) DO NOTHING``: the second
-   one inserts nothing and reports "skipped" (the same SQL Prisma's
-   ``createMany({ skipDuplicates: true })`` uses).
+   one inserts nothing and reports "skipped".
 
 The document row and its chunks are written in one transaction: a crash halfway leaves
 nothing behind, never a document with half of its chunks. Extraction and embedding run

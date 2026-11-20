@@ -2,7 +2,7 @@
 
 The model never decides permissions. It only sees the tools its user's role allows, and
 every call is checked again here before it runs, because a model can name a tool it was
-never shown. ≈ a NestJS guard with ``@Roles()`` on each handler, but for tools.
+never shown.
 
 Identity (tenant, user, role) comes from the authenticated request or the MCP server's
 launch configuration, never from tool arguments: a model cannot act for someone else.

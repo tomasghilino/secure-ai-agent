@@ -18,7 +18,7 @@ Prices below come from the **AWS Price List API** (`AmazonBedrock` and
 | Amazon Nova Lite | On-demand + profile | 0.06 / 0.24 | Cheap multimodal baseline |
 | Amazon Nova 2 Lite | Inference profile only | 0.33 / 2.75 | More expensive; lifecycle date close (EOL no sooner than 2026-12-02) |
 | Titan Text Embeddings V2 | On-demand | 0.02 (input only) | 256/512/1024 dims, normalized output |
-| Cohere Rerank 3.5 | On-demand | priced per query | Candidate reranker for Day 2 |
+| Cohere Rerank 3.5 | On-demand | priced per query | Candidate reranker |
 
 ## Decision
 
@@ -31,7 +31,7 @@ Prices below come from the **AWS Price List API** (`AmazonBedrock` and
   choice worth ~10% over the global profile).
 - **Baseline for model comparison** (optional): Amazon Nova Micro.
 - **Embeddings**: `amazon.titan-embed-text-v2:0`, 1024 dimensions, normalized.
-- **Reranker**: decided on Day 2 from measured retrieval gains.
+- **Reranker**: decided from measured retrieval gains.
 - Model IDs are configuration (`BEDROCK_CHAT_MODEL_ID`, `BEDROCK_EMBEDDING_MODEL_ID`).
 
 ## Why not a new dedicated member account
@@ -62,6 +62,6 @@ the ephemeral staging infrastructure.
 ## Consequences
 
 - Until the quotas are restored, development uses the deterministic fake providers
-  (ADR-0003); no Day 1 work is blocked.
+  (ADR-0003); local development is not blocked.
 - If Titan V2 is not restored in time, a local embedding model is the documented fallback,
   and every benchmark must state which embedding model produced it.

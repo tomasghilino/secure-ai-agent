@@ -4,9 +4,8 @@ An MCP server declares its tools (name, description, input schema) and the model
 those descriptions as instructions. A malicious or compromised server can hide
 instructions in a description ("tool poisoning") or change it after it was reviewed
 ("rug pull"). So the client does not trust the listing: every tool must match the
-reviewed definition in our catalog, by hash, or the connection is refused.
-
-≈ ``package-lock.json`` integrity hashes, but for tool definitions.
+reviewed definition in our catalog, by hash, or the connection is refused (the same
+idea as the integrity hashes in a lockfile).
 """
 
 from __future__ import annotations

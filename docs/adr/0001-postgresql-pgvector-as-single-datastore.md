@@ -24,7 +24,7 @@ Use one PostgreSQL 17 database with the `pgvector` extension for everything:
 | Option | Why not |
 | --- | --- |
 | Amazon OpenSearch Serverless | Minimum OCU capacity costs far more than the whole budget; excluded by constraint |
-| Bedrock Knowledge Bases | Managed black box: hides chunking/retrieval we need to learn and evaluate; excluded by constraint |
+| Bedrock Knowledge Bases | Managed black box: hides chunking/retrieval we need to control and evaluate; excluded by constraint |
 | Pinecone / Weaviate / Qdrant | Extra service, extra network hop, and a second place to enforce tenancy and RBAC |
 | Chroma / FAISS in-process | Not a system of record; no transactions with business data, no RLS |
 

@@ -5,8 +5,7 @@
 - ``ollama``  ``ChatOllama`` with Qwen3 8B on the local GPU (free, private).
 - ``bedrock`` ``ChatBedrockConverse`` with Claude Haiku in staging (costs money).
 
-LangGraph (Day 3) drives any ``BaseChatModel``, so the agent reuses this same factory.
-≈ in Node, the Vercel AI SDK or LangChain.js: one ``generateText`` call, swappable providers.
+The LangGraph agent drives any ``BaseChatModel``, so it reuses this same factory.
 """
 
 from __future__ import annotations

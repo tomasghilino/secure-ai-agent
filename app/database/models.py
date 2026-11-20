@@ -180,7 +180,7 @@ class IngestionJobRecord(Base):
 class EmbeddingCacheRecord(Base):
     """A vector already computed for a text, so unchanged text is never embedded twice.
 
-    Keyed by tenant: sharing vectors across tenants would let one tenant learn, from a
+    Keyed by tenant: sharing vectors across tenants would let one tenant infer, from a
     cache hit, that another tenant has the exact same text.
     """
 
@@ -198,7 +198,7 @@ class EmbeddingCacheRecord(Base):
 
 
 # --------------------------------------------------------------------------- business data
-# Read by the agent's tools (Day 3). Seeded from data/source/business with `make seed`.
+# Read by the agent's tools. Seeded from data/source/business with `make seed`.
 
 Money = Numeric(12, 2)  # exact decimal amounts, never float
 
@@ -334,7 +334,7 @@ class SupplierRecord(Base):
     contract_doc_key: Mapped[str | None]  # e.g. NSI-AGR-SUP-014
 
 
-# --------------------------------------------------------------------------- agent (Day 3)
+# --------------------------------------------------------------------------- agent
 
 
 class AgentThreadRecord(Base):

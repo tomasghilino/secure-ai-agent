@@ -2,7 +2,7 @@
 # support tickets and suppliers tables (`make seed`). Products come from products.yaml.
 # All names and figures are fictional.
 #
-# Many records are deliberate scenarios for the agent (Day 3), noted in comments. They are
+# Many records are deliberate scenarios for the agent, noted in comments. They are
 # written against a reference date of 2026-11-15 and the active policies:
 # returns within 30 days of delivery (NSI-POL-RET-003 v3.0; 45 days in the superseded v2.1),
 # build-to-order and final-sale items not returnable, SLA response targets per support tier

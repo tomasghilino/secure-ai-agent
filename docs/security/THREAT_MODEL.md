@@ -34,7 +34,7 @@ Reference lists used for the threat table (IDs appear in the table below):
 
 ```mermaid
 flowchart LR
-    U[User / caller] -->|HTTP, identity headers in dev; JWT on Day 4| API
+    U[User / caller] -->|HTTP, identity headers in dev; JWT planned| API
     subgraph App["Application (trusted code)"]
         API[FastAPI] --> AG[LangGraph agent]
         AG -->|authorize + validate| TR[Tool runtime]
@@ -58,7 +58,7 @@ Status: ✅ in place · 🟡 partial · ⏳ planned (day)
 | # | Threat | Framework IDs | Control | Where | Status / test |
 | --- | --- | --- | --- | --- | --- |
 | T1 | One tenant reads another's documents or records (also via vector search) | LLM02, LLM08 | Tenant filter in every query **and** Row-Level Security that fails closed; per-tenant embedding cache | `app/database/tenancy.py`, RLS migration | ✅ `test_tenancy.py`, guard test for new tables |
-| T2 | Direct prompt injection ("ignore your instructions…") | LLM01, ASI01 | System prompt boundaries; the model has no privileged tools to abuse; outputs validated in code | `app/rag/answer.py`, `app/agents/` | 🟡 basic; red-team set ⏳ Day 4 |
+| T2 | Direct prompt injection ("ignore your instructions…") | LLM01, ASI01 | System prompt boundaries; the model has no privileged tools to abuse; outputs validated in code | `app/rag/answer.py`, `app/agents/` | 🟡 basic; red-team set ⏳ planned |
 | T3 | Indirect prompt injection from a document or a ticket | LLM01, ASI01, ASI06 | Sources and tool results are delimited, JSON-encoded, size-capped and declared as data; an injected instruction can at most produce a *proposal* a human reviews | `app/rag/context.py`, `app/agents/graph.py` | ✅ ticket T-5009 scenario + test |
 | T4 | The agent does more than it should (excessive agency) | LLM06, ASI02 | Read-only tools; one write action, executed only after approval (Scope 2) | `app/tools/catalog.py`, `app/agents/graph.py` | ✅ graph tests |
 | T5 | A role uses a tool it should not (e.g. support agent reads invoices) | LLM06, ASI03 | Deny-by-default role × tool matrix, checked at execution; the model only sees allowed tools | `app/tools/authorization.py` | ✅ unit + integration tests |
@@ -66,17 +66,17 @@ Status: ✅ in place · 🟡 partial · ⏳ planned (day)
 | T7 | Self-approval or double execution of an action | ASI09 | Approver must hold `supervisor` and differ from the requester (checked in code **and** a DB CHECK); atomic claim of the pending approval; one RMA per order | `app/agents/service.py`, migration | ✅ API tests |
 | T8 | The human approves based on a misleading model summary | ASI09 | The approval request shows facts read from the database (order, dates, lines), not the model's words | `app/tools/actions.py` | ✅ |
 | T9 | Malformed or malicious tool arguments (SQL injection, huge inputs) | LLM05, MCP05 | Strict Pydantic schemas (patterns, lengths, `extra="forbid"`), parameterized SQL, row limits | `app/tools/` | ✅ unit tests |
-| T10 | Runaway loops and token spend | LLM10, ASI08 | Max model steps, max tool calls per step, max output tokens, prompt budget | settings `AGENT_*`, `RAG_*` | ✅ step-limit test; per-tenant budget ⏳ Day 4 |
+| T10 | Runaway loops and token spend | LLM10, ASI08 | Max model steps, max tool calls per step, max output tokens, prompt budget | settings `AGENT_*`, `RAG_*` | ✅ step-limit test; per-tenant budget ⏳ planned |
 | T11 | Nobody can tell what the agent did | ASI10, STRIDE repudiation | Append-only audit log: the app role can INSERT and SELECT, not UPDATE or DELETE | `audit_events`, migration | ✅ test that UPDATE is refused |
 | T12 | MCP tool poisoning or rug pull (a tool description changes after review) | MCP03, ASI04 | The client pins each tool (hash of name, description, schema) and refuses unknown or changed tools | `app/agents/mcp_client.py` | ✅ test with a tampered server |
 | T13 | MCP server with broad privileges or token passthrough | MCP01, MCP02, MCP07 | stdio only (no network port), read-only tools, one principal fixed at launch, no tokens forwarded | `app/mcp_server/` | ✅ |
-| T14 | Sensitive data in logs or in the model's context | LLM02, MCP01 | Logs never contain prompts, documents or tool outputs; tools return only the fields a task needs | `app/core/logging.py`, tools | 🟡 by convention; redaction review ⏳ Day 4 |
-| T15 | Spoofed identity (anyone can send `X-Tenant-ID`) | STRIDE spoofing, API2 | Dev headers only accepted in `local`/`test`; Day 4: verified JWT (signature, issuer, audience, expiry) | `app/api/dependencies.py` | 🟡 ⏳ Day 4 |
-| T16 | Vulnerable or tampered dependencies, leaked secrets in git | LLM03, ASI04 | Lockfile (`uv.lock`), signed commits; Day 4 CI: `pip-audit`, `gitleaks`, Trivy, SBOM, Dependabot, actions pinned by SHA | CI | 🟡 ⏳ Day 4 |
-| T17 | Over-privileged cloud identity or public data | Cloud | Least-privilege IAM per service, encryption at rest, TLS only, no public buckets, VPC endpoints | Terraform | ⏳ Day 4 |
-| T18 | Poisoned knowledge base (a malicious PDF uploaded as policy) | LLM04 | Uploads only by authenticated users of the tenant, size/type validation, version registry; Day 4: upload restricted to an `editor` role | `app/api/documents.py` | 🟡 |
+| T14 | Sensitive data in logs or in the model's context | LLM02, MCP01 | Logs never contain prompts, documents or tool outputs; tools return only the fields a task needs | `app/core/logging.py`, tools | 🟡 by convention; redaction review ⏳ planned |
+| T15 | Spoofed identity (anyone can send `X-Tenant-ID`) | STRIDE spoofing, API2 | Dev headers only accepted in `local`/`test`; planned: verified JWT (signature, issuer, audience, expiry) | `app/api/dependencies.py` | 🟡 ⏳ planned |
+| T16 | Vulnerable or tampered dependencies, leaked secrets in git | LLM03, ASI04 | Lockfile (`uv.lock`), signed commits; planned CI: `pip-audit`, `gitleaks`, Trivy, SBOM, Dependabot, actions pinned by SHA | CI | 🟡 ⏳ planned |
+| T17 | Over-privileged cloud identity or public data | Cloud | Least-privilege IAM per service, encryption at rest, TLS only, no public buckets, VPC endpoints | Terraform | ⏳ planned |
+| T18 | Poisoned knowledge base (a malicious PDF uploaded as policy) | LLM04 | Uploads only by authenticated users of the tenant, size/type validation, version registry; planned: upload restricted to an `editor` role | `app/api/documents.py` | 🟡 |
 
-Observed with the local model (Day 3): Qwen3 8B without thinking proposed a return
+Observed with the local model: Qwen3 8B without thinking proposed a return
 authorization for an order outside the policy window. The approval gate (T4, T8) stopped
 it; a supervisor saw `days_since_delivery: 40` and rejected it. The same model reported and
 ignored the injected instruction in ticket T-5009 (T3).
@@ -85,17 +85,16 @@ Residual risks, stated plainly:
 - LangGraph checkpoint tables (conversation state) are not under RLS; access goes through
   the thread ownership check in `agent_threads`, which is.
 - The local model can still be talked into a wrong *answer* (no write happens, but the
-  text can be wrong). Faithfulness checks are Day 4.
-- Development identity headers are spoofable by design until Day 4.
+  text can be wrong). Faithfulness checks are planned.
+- Development identity headers are spoofable by design until JWT authentication lands.
 - Calls through MCP are audited with the server's identity but without the agent's thread
   id; correlation needs a run id in the MCP request metadata.
 
 ## 5. Security roadmap
 
-Nothing extreme: each item is small, testable and maps to a real control a cloud security
-or AI security interview asks about.
+Each item is small, testable and maps to a concrete control.
 
-### Day 3 — agent and MCP (built)
+### Agent and MCP (done)
 - [x] Least agency: read-only tools + one approval-gated action (T4)
 - [x] Role × tool authorization, deny by default, re-checked at execution (T5)
 - [x] Identity from trusted context; separation of duties for approvals (T6, T7)
@@ -105,7 +104,7 @@ or AI security interview asks about.
 - [x] Append-only audit log (T11)
 - [x] MCP: stdio, read-only, fixed principal; client-side tool pinning (T12, T13)
 
-### Day 4 — application and supply chain
+### Next — application and supply chain
 - [ ] JWT authentication (local JWKS in dev, Cognito-compatible); roles from claims (T15)
 - [ ] Rate limits and a per-tenant daily token budget (T10)
 - [ ] Safe error responses, security headers, upload restricted to an editor role (T18)
@@ -116,7 +115,7 @@ or AI security interview asks about.
       `permissions:` (T16)
 - [ ] Hardened container: non-root user, slim runtime, no dev tools (T16)
 
-### Day 4 — cloud (Terraform, plan only until approved)
+### Next — cloud (Terraform)
 - [ ] IAM least privilege: one task role per service; `bedrock:InvokeModel` only on the two
       model ARNs; S3/SQS limited to the project resources; validated with IAM Access
       Analyzer `validate-policy` and Checkov/Trivy (T17)
@@ -129,9 +128,9 @@ or AI security interview asks about.
 - [ ] (S, paid) Bedrock Guardrails prompt-attack filter measured on the red-team set, only
       with approval
 
-### How this maps to cloud security skills
+### Security domains covered
 
-| Skill area (AWS Security Specialty style) | Practised here |
+| Domain | Where |
 | --- | --- |
 | Identity and access management | Role × tool matrix, separation of duties, IAM task roles, OIDC |
 | Data protection | RLS tenant isolation, encryption at rest, data minimisation |

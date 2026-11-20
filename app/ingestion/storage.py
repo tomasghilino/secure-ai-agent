@@ -59,4 +59,4 @@ def _write_atomically(path: Path, data: bytes) -> None:
 
 
 def build_storage(settings: Settings) -> ObjectStorage:
-    return LocalFileStorage(settings.storage_root)  # S3 adapter: Day 4
+    return LocalFileStorage(settings.storage_root)  # S3 adapter: planned

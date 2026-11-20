@@ -5,7 +5,7 @@
 
 ## Context
 
-Day 3 adds an agent that combines policy documents (RAG) with business records (orders,
+The agent combines policy documents (RAG) with business records (orders,
 invoices, tickets) and can lead to one real change: a return authorization (RMA). An
 agent turns the model's output into actions, so the questions are less "how good is the
 answer" and more "what is the worst thing it can do, and who decides". References: OWASP

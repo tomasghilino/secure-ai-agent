@@ -1,5 +1,5 @@
 [project]
-name = "northstar-ai-operations-copilot"
+name = "secure-ai-agent"
 version = "0.1.0"
 description = "Enterprise AI operations copilot: advanced RAG, LangGraph agents, MCP tools and human approval on AWS Bedrock."
 readme = "README.md"

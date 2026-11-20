@@ -1,4 +1,4 @@
-"""What each request receives through FastAPI's ``Depends`` (≈ NestJS providers and guards).
+"""What each request receives through FastAPI's ``Depends``.
 
 Long-lived resources (the connection pool, the embedding client, the queue client) are
 created once in the app lifespan and kept on ``app.state``; these functions hand them to
@@ -32,10 +32,10 @@ def get_tenant_id(
 ) -> str:
     """The caller's tenant: every tenant-scoped query takes it from here, never from a body.
 
-    Development stand-in until authentication exists (Day 4): the tenant comes from the
-    X-Tenant-ID header, accepted only in the local and test environments. Day 4 replaces
-    this function with one that reads the tenant from a verified JWT; endpoints do not
-    change.
+    Development stand-in until authentication exists: the tenant comes from the
+    X-Tenant-ID header, accepted only in the local and test environments. JWT
+    authentication will replace this function with one that reads the tenant from a
+    verified token; endpoints do not change.
     """
     if settings.app_env not in ("local", "test"):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "authentication is not configured")
@@ -52,9 +52,9 @@ def get_principal(
     """Who is calling: tenant, user and role (agent endpoints).
 
     Same development stand-in as the tenant (only accepted in local/test, enforced by
-    ``get_tenant_id``): Day 4 reads all three from a verified JWT. A role sent by the
-    client is exactly what a real system must never trust; it is acceptable here only
-    because these headers do not work outside local and test.
+    ``get_tenant_id``): JWT authentication will read all three from a verified token. A
+    role sent by the client is exactly what a real system must never trust; it is
+    acceptable here only because these headers do not work outside local and test.
     """
     if x_user_id is None or x_user_role is None:
         raise HTTPException(

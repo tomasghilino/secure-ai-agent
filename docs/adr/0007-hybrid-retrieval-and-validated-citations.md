@@ -5,7 +5,7 @@
 
 ## Context
 
-Day 2 turns search into question answering. Two decisions shape it:
+This step turns search into question answering. Two decisions shape it:
 
 1. **How to retrieve.** Embeddings understand paraphrases and other languages but blur
    exact identifiers (NX-4400 vs NX-4400B, form numbers). PostgreSQL full-text search is
@@ -38,7 +38,7 @@ Day 2 turns search into question answering. Two decisions shape it:
 - The code then validates: no sources → no model call; the refusal word, no citations or a
   citation to a number that was not given → "insufficient evidence", with the reason.
 - One LangChain `BaseChatModel` factory: fake (tests), Ollama Qwen3 8B (local), Bedrock
-  Converse (staging). Day 3's agent reuses it.
+  Converse (staging). The agent reuses it.
 
 ## Alternatives considered
 
@@ -55,7 +55,7 @@ Day 2 turns search into question answering. Two decisions shape it:
 
 - Citation validation proves *where* an answer claims to come from, not that the claim is
   right: in the evaluation, Qwen3 8B cited the correct table and still misread a value
-  range. Faithfulness needs a separate check (Ragas or an LLM judge, Day 4).
+  range. Faithfulness needs a separate check (Ragas or an LLM judge, planned).
 - `LLM_REASONING=true` (Qwen3 thinking) fixed that misreading at roughly 10x latency and
   tokens; it is off by default.
 - Every retrieval change must be re-run through `make eval-retrieval` before it is kept.

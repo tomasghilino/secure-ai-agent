@@ -49,7 +49,7 @@ KEYWORD_WEIGHT = 0.5  # relative to the dense ranking (1.0); see the module docs
 class SearchFilters:
     # The versions in force on this date (point-in-time questions) instead of the active ones.
     as_of: date | None = None
-    # Only these classification levels. Role-based limits arrive with authentication (Day 4).
+    # Only these classification levels. Role-based limits arrive with authentication.
     classifications: tuple[str, ...] | None = None
     doc_keys: tuple[str, ...] | None = None
 

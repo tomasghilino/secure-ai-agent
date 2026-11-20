@@ -1,6 +1,6 @@
 # Architecture — Northstar AI Operations Copilot
 
-> Status: **proposed** (Day 0). Sections are refined as each milestone lands.
+> Sections are refined as each milestone lands.
 > Significant decisions are recorded as ADRs in [`docs/adr`](../adr).
 
 ## 1. Problem and scope
@@ -54,7 +54,7 @@ Isolation is enforced twice: in application queries **and** with PostgreSQL
 Row-Level Security (defense in depth). The tenant always comes from the verified token,
 never from model output or request bodies.
 
-## 3. Ingestion pipeline (Day 1)
+## 3. Ingestion pipeline
 
 ```mermaid
 sequenceDiagram
@@ -101,7 +101,7 @@ Key properties:
   re-indexing unchanged text is free.
 - **Failure handling**: visibility timeout + max receive count → dead-letter queue.
 
-## 4. Query path — RAG (Day 2)
+## 4. Query path — RAG
 
 ```mermaid
 flowchart TD
@@ -124,7 +124,7 @@ flowchart TD
 Every stage is a separate, testable component (`app/rag/*`). Retrieval is evaluated
 **independently** of generation (recall@k / precision@k / MRR on a labelled dataset).
 
-## 5. Agent orchestration (Day 3, built)
+## 5. Agent orchestration
 
 ```mermaid
 stateDiagram-v2

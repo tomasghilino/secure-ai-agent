@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     bedrock_embedding_model_id: str = "amazon.titan-embed-text-v2:0"
 
     # --- Uploads, object storage and queue (ADR-0003) ---
-    # Uploaded PDFs: a local directory in development, S3 in staging (Day 4).
+    # Uploaded PDFs: a local directory in development, S3 in staging (planned).
     storage_root: Path = Path("data/storage")
     # Unset = real SQS. Only staging may use it: local and test always talk to ElasticMQ,
     # so a development machine never sends messages to AWS by accident.
@@ -86,7 +86,7 @@ class Settings(BaseSettings):
     # --- Cost guardrails ---
     llm_max_output_tokens: int = Field(default=800, ge=64, le=4096)
 
-    # --- Agent (Day 3) ---
+    # --- Agent ---
     # Kill switch: false makes every agent endpoint answer 503 without calling the model.
     agent_enabled: bool = True
     # Bounded loop: model calls per user message, tool calls per model turn, tool result

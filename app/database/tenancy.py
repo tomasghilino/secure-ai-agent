@@ -13,8 +13,7 @@ Who uses what:
   filter still cannot see or write another tenant's rows.
 - Migrations, seeding and admin scripts: plain sessions as the table owner (no policies).
 
-≈ in Prisma you would run ``SET LOCAL`` inside an interactive ``$transaction`` before the
-queries; here an event hook does it for every transaction of the session.
+An event hook applies it to every transaction of the session, so no query can skip it.
 """
 
 from __future__ import annotations
