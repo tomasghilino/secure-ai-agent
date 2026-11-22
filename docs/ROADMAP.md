@@ -21,10 +21,13 @@
 - CI: lint, types, unit and integration tests, gitleaks, pip-audit, Trivy, SBOM,
   actionlint; actions pinned by SHA, images by digest; Dependabot
 - Hardened production image (non-root, read-only root filesystem, no package manager)
+- Terraform for a private, disposable AWS staging: API Gateway with a Cognito JWT
+  authorizer, ECS Fargate without an internet route, VPC endpoints with data-perimeter
+  policies, a customer-managed KMS key, least-privilege IAM, image pushes through OIDC
 
 ## Next
 
+- Apply the staging environment, run the verification checks, destroy it
 - Red-team and faithfulness results with real models (Qwen3 locally, Claude on Bedrock)
-- Terraform for an ephemeral AWS staging on Amazon Bedrock: Cognito as the JWT issuer,
-  least-privilege IAM, OIDC for CI, encryption at rest, VPC endpoints, WAF rate limiting
+- A database login role with IAM authentication instead of the RDS master user
 - Tracing (OpenTelemetry or Langfuse) correlated with the request ID

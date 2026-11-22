@@ -25,6 +25,10 @@ through read-only tools, and never changes anything without a human approval.
   in CI; verdicts come from the database and tool trace ([results](docs/benchmarks/2026-11-22-red-team.md)).
 - **Supply chain**: CI runs gitleaks, pip-audit, Trivy and produces an SBOM; actions are
   pinned by SHA and images by digest; the production image runs non-root and read-only.
+- **AWS staging in Terraform**: API Gateway with a Cognito JWT authorizer in front of ECS
+  Fargate tasks that have no route to the internet; VPC endpoints with data-perimeter
+  policies, one customer-managed KMS key, least-privilege IAM and image pushes through OIDC
+  ([decision](docs/adr/0011-private-staging-on-aws.md), [runbook and cost](docs/operations/staging.md)).
 - **MCP server** (read-only, stdio) usable from any MCP client; the agent's MCP client
   pins tool definitions by hash.
 - **Async ingestion**: PDF upload → queue → idempotent worker (extraction, chunking,
@@ -38,7 +42,7 @@ through read-only tools, and never changes anything without a human approval.
 | Data | PostgreSQL 17, pgvector (HNSW), full-text search, SQLAlchemy 2 (async), Alembic |
 | AI | LangChain, LangGraph, MCP Python SDK |
 | Models | Ollama locally (Qwen3 8B, Qwen3-Embedding); Amazon Bedrock for staging (Claude Haiku, Titan Embeddings V2) |
-| Infrastructure | Docker Compose, SQS API (ElasticMQ locally) |
+| Infrastructure | Docker Compose, Terraform, ECS Fargate, API Gateway, Cognito, RDS, S3, SQS, KMS |
 | Quality and security | pytest (unit, integration, real-model), ruff, mypy (strict), uv, GitHub Actions, gitleaks, pip-audit, Trivy |
 
 ## Run it locally
@@ -73,4 +77,5 @@ command.
 - [Architecture decision records](docs/adr)
 - [RAG evaluation results](docs/benchmarks/2026-11-19-rag-local.md)
 - [Red-team and supply-chain results](docs/benchmarks/2026-11-22-red-team.md)
+- [AWS staging runbook](docs/operations/staging.md)
 - [Roadmap](docs/ROADMAP.md)
