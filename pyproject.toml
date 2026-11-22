@@ -20,6 +20,7 @@ dependencies = [
     "psycopg[binary]>=3.3.9",
     "pydantic>=2.14",
     "pydantic-settings>=2.16",
+    "pyjwt[crypto]>=2.15.1",
     "pymupdf>=2.1",
     "python-multipart>=0.0.34",
     "sqlalchemy[asyncio]>=2.1.8",

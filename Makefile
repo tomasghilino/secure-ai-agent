@@ -3,11 +3,11 @@
 # Windows (cmd.exe). Run `make help` to list targets.
 
 .DEFAULT_GOAL := help
-.PHONY: help setup data dev up down migrate migration seed ingest worker search ask agent approve mcp eval-retrieval eval-answers llm-up llm-pull test test-integration test-llm lint format typecheck check
+.PHONY: help setup data dev up down migrate migration seed ingest worker search ask agent approve mcp token eval-retrieval eval-answers llm-up llm-pull test test-integration test-llm lint format typecheck check
 
 OLLAMA_CHAT_MODEL ?= qwen3:8b
 OLLAMA_EMBEDDING_MODEL ?= qwen3-embedding:0.6b
-# Development identity for `make agent` / `make mcp` (to be replaced by JWT authentication).
+# Development identity for `make agent`, `make mcp` and `make token`.
 tenant ?= nsi-amer
 role ?= support_agent
 user ?= agent-1
@@ -60,6 +60,9 @@ approve: ## Decide a pending agent action as supervisor sup-1: make approve t=<t
 
 mcp: ## Run the read-only MCP server on stdio: make mcp [tenant=... role=...] (for MCP clients)
 	uv run python -m app.mcp_server --tenant $(tenant) --role $(role) --user $(user)
+
+token: ## Mint a local JWT for the API (AUTH_MODE=jwt): make token [role=supervisor user=sup-1]
+	uv run python -m scripts.dev_token --tenant $(tenant) --role $(role) --user $(user)
 
 eval-retrieval: ## Retrieval metrics (dense vs keyword vs hybrid) on data/evaluation; free
 	uv run python -m scripts.evaluate_retrieval

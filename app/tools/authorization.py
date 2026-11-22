@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, cast, get_args
 
-Role = Literal["support_agent", "finance_analyst", "supervisor"]
+Role = Literal["support_agent", "finance_analyst", "supervisor", "editor"]
 ROLES: tuple[Role, ...] = get_args(Role)
 
 READ_POLICIES = "search_policies"
@@ -28,8 +28,13 @@ ROLE_TOOLS: dict[Role, frozenset[str]] = {
     # Supervisors see everything and are the only ones who approve actions.
     "supervisor": _SHARED
     | {"get_ticket", "get_invoice", "list_overdue_invoices", "get_supplier", REQUEST_RETURN},
+    # Knowledge-base editors upload policies and check what is indexed; no business data.
+    "editor": frozenset({READ_POLICIES}),
 }
 APPROVER_ROLES: frozenset[Role] = frozenset({"supervisor"})
+# Who may add documents to the knowledge base (OWASP LLM04, data poisoning). Not the
+# approvers: whoever approves returns cannot also rewrite the returns policy.
+DOCUMENT_EDITOR_ROLES: frozenset[Role] = frozenset({"editor"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +44,11 @@ class Principal:
     tenant_id: str
     user_id: str
     role: Role
+
+
+def parse_role(value: str) -> Role | None:
+    """``value`` as a known role, or None."""
+    return value if value in ROLES else None
 
 
 def is_allowed(role: str, tool_name: str) -> bool:

@@ -51,8 +51,46 @@ def test_local_environments_always_use_the_local_queue(
     assert Settings(_env_file=None).sqs_endpoint_url == "http://localhost:9324"  # type: ignore[call-arg]
 
 
+# What a deployed environment needs: verified tokens instead of identity headers.
+STAGING_AUTH = {
+    "AUTH_MODE": "jwt",
+    "AUTH_JWT_ISSUER": "https://issuer.example",
+    "AUTH_JWT_AUDIENCE": "secure-ai-agent",
+    "AUTH_JWKS_URL": "https://issuer.example/.well-known/jwks.json",
+}
+
+
 def test_staging_uses_the_real_queue(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("APP_ENV", "staging")
+    for name, value in STAGING_AUTH.items():
+        monkeypatch.setenv(name, value)
     monkeypatch.delenv("SQS_ENDPOINT_URL", raising=False)
 
     assert Settings(_env_file=None).sqs_endpoint_url is None  # type: ignore[call-arg]
+
+
+def test_staging_refuses_to_start_with_identity_headers(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("APP_ENV", "staging")
+
+    with pytest.raises(ValidationError, match="dev_headers is only allowed"):
+        Settings(_env_file=None)  # type: ignore[call-arg]
+
+
+@pytest.mark.parametrize(
+    ("override", "message"),
+    [
+        ({"AUTH_JWT_AUDIENCE": ""}, "AUTH_JWT_ISSUER and AUTH_JWT_AUDIENCE"),
+        ({"AUTH_JWKS_PATH": "jwks.json"}, "exactly one of"),
+        ({"AUTH_JWKS_URL": "http://issuer.example/jwks.json"}, "must use https"),
+        ({"AUTH_JWT_ALGORITHMS": '["HS256"]'}, "must be asymmetric"),
+        ({"AUTH_JWT_ALGORITHMS": '["none"]'}, "must be asymmetric"),
+    ],
+)
+def test_an_incomplete_jwt_setup_is_refused(
+    monkeypatch: pytest.MonkeyPatch, override: dict[str, str], message: str
+) -> None:
+    for name, value in {**STAGING_AUTH, **override}.items():
+        monkeypatch.setenv(name, value)
+
+    with pytest.raises(ValidationError, match=message):
+        Settings(_env_file=None)  # type: ignore[call-arg]

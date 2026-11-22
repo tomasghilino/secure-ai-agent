@@ -12,12 +12,18 @@ from app.core.config import Settings, get_settings
 from app.ingestion.pipeline import DocumentMetadata
 from app.ingestion.storage import LocalFileStorage
 from app.main import create_app
+from app.security.limits import Unlimited
 from tests.conftest import GeneratedPdfs
 from tests.integration.conftest import RETURNS_V3_0, SUPPORT_SLA, InMemoryJobQueue
 
 pytestmark = pytest.mark.integration
 
-AMER = {"X-Tenant-ID": "nsi-amer"}
+
+def caller(tenant: str, role: str = "editor") -> dict[str, str]:
+    return {"X-Tenant-ID": tenant, "X-User-ID": "editor-1", "X-User-Role": role}
+
+
+AMER = caller("nsi-amer")
 
 
 def form(metadata: DocumentMetadata) -> dict[str, str]:
@@ -45,6 +51,7 @@ async def client(
     app.dependency_overrides[get_session] = lambda: session_with_returns_policies
     app.dependency_overrides[get_storage] = lambda: storage
     app.dependency_overrides[get_job_queue] = lambda: queue
+    app.state.usage_limits = Unlimited()
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
@@ -158,8 +165,23 @@ async def test_another_tenant_cannot_see_the_job(
         "/v1/documents", headers=AMER, files=pdf_file(pdf), data=form(metadata)
     )
 
-    response = await client.get(
-        f"/v1/jobs/{upload.json()['job_id']}", headers={"X-Tenant-ID": "nsi-emea"}
-    )
+    response = await client.get(f"/v1/jobs/{upload.json()['job_id']}", headers=caller("nsi-emea"))
 
     assert response.status_code == 404
+
+
+@pytest.mark.parametrize("role", ["support_agent", "finance_analyst", "supervisor"])
+async def test_only_editors_can_add_documents(
+    client: httpx.AsyncClient, generated_pdfs: GeneratedPdfs, queue: InMemoryJobQueue, role: str
+) -> None:
+    metadata, pdf = generated_pdfs[SUPPORT_SLA]
+
+    response = await client.post(
+        "/v1/documents",
+        headers=caller("nsi-amer", role),
+        files=pdf_file(pdf),
+        data=form(metadata),
+    )
+
+    assert response.status_code == 403
+    assert queue.sent == []  # refused before anything was stored or queued

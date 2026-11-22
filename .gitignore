@@ -17,6 +17,8 @@ build/
 !.env.example
 *.pem
 *.key
+# Local development token issuer (`make token`)
+.auth/
 
 # --- Local data (regenerated deterministically) ---
 data/storage/*

@@ -25,6 +25,15 @@ Provider = Literal["fake", "ollama", "bedrock"]
 # ElasticMQ from docker compose, as seen from the host (containers override it).
 LOCAL_SQS_ENDPOINT = "http://localhost:9324"
 
+# dev_headers -> identity from X-Tenant-ID / X-User-ID / X-User-Role (local and test only)
+# jwt         -> a signed bearer token from an OpenID Connect provider (required in staging)
+AuthMode = Literal["dev_headers", "jwt"]
+# Asymmetric signatures only. "none" and HMAC (HS256...) are never accepted, so a public
+# key can never be replayed as an HMAC secret (algorithm confusion).
+ASYMMETRIC_JWT_ALGORITHMS = frozenset(
+    {"RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA"}
+)
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -38,6 +47,26 @@ class Settings(BaseSettings):
     app_env: Environment = "local"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_format: Literal["console", "json"] = "console"
+
+    # --- Authentication (ADR-0009) ---
+    auth_mode: AuthMode = "dev_headers"
+    auth_jwt_issuer: str | None = None  # exact `iss` expected
+    auth_jwt_audience: str | None = None  # exact `aud` expected (this API)
+    # Where the provider's public keys come from: its JWKS endpoint in deployed
+    # environments, or a local file in development (`make token` creates one).
+    auth_jwks_url: str | None = None
+    auth_jwks_path: Path | None = None
+    auth_jwt_algorithms: list[str] = Field(default_factory=lambda: ["RS256"])
+    # Claim names differ per provider (Cognito: "custom:tenant_id", "cognito:groups").
+    auth_tenant_claim: str = "tenant_id"
+    auth_roles_claim: str = "roles"
+    auth_clock_skew_seconds: int = Field(default=30, ge=0, le=300)
+
+    # --- Abuse and cost limits (ADR-0009) ---
+    # Requests per user per minute on every /v1 endpoint.
+    rate_limit_per_minute: int = Field(default=60, ge=1, le=10_000)
+    # Model tokens (input + output) a tenant may spend per UTC day: "denial of wallet".
+    tenant_daily_token_budget: int = Field(default=500_000, ge=1_000)
 
     # --- Database ---
     database_url: str = "postgresql+psycopg://northstar:northstar@localhost:5432/northstar"
@@ -107,7 +136,7 @@ class Settings(BaseSettings):
     # Fixed at launch, never taken from the model or the client (no confused deputy).
     mcp_tenant_id: str | None = Field(default=None, pattern=r"^[a-z0-9-]{1,64}$")
     mcp_user_id: str = Field(default="mcp-client", pattern=r"^[A-Za-z0-9._@-]{1,64}$")
-    mcp_role: Literal["support_agent", "finance_analyst", "supervisor"] | None = None
+    mcp_role: Literal["support_agent", "finance_analyst", "supervisor", "editor"] | None = None
 
     @field_validator("embedding_dimensions")
     @classmethod
@@ -123,6 +152,27 @@ class Settings(BaseSettings):
             raise ValueError(
                 "LLM_PROVIDER=bedrock requires BEDROCK_CHAT_MODEL_ID "
                 "(verify availability in your region first)."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _authentication(self) -> Settings:
+        # Fail at startup, not on the first request: a deployed API must never trust
+        # identity headers, and a JWT setup without issuer or audience is not a check.
+        if self.auth_mode == "dev_headers":
+            if self.app_env not in ("local", "test"):
+                raise ValueError("AUTH_MODE=dev_headers is only allowed in local and test")
+            return self
+        if not self.auth_jwt_issuer or not self.auth_jwt_audience:
+            raise ValueError("AUTH_MODE=jwt requires AUTH_JWT_ISSUER and AUTH_JWT_AUDIENCE")
+        if (self.auth_jwks_url is None) == (self.auth_jwks_path is None):
+            raise ValueError("AUTH_MODE=jwt requires exactly one of AUTH_JWKS_URL, AUTH_JWKS_PATH")
+        if self.auth_jwks_url is not None and not self.auth_jwks_url.startswith("https://"):
+            raise ValueError("AUTH_JWKS_URL must use https")
+        algorithms = set(self.auth_jwt_algorithms)
+        if not algorithms or not algorithms <= ASYMMETRIC_JWT_ALGORITHMS:
+            raise ValueError(
+                f"AUTH_JWT_ALGORITHMS must be asymmetric: {sorted(ASYMMETRIC_JWT_ALGORITHMS)}"
             )
         return self
 

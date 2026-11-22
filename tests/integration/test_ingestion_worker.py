@@ -24,6 +24,7 @@ from app.ingestion.storage import LocalFileStorage
 from app.ingestion.worker import handle_message
 from app.main import create_app
 from app.rag.embeddings import FakeEmbeddings
+from app.security.limits import Unlimited
 from tests.conftest import GeneratedPdfs
 from tests.integration.conftest import SUPPORT_SLA, InMemoryJobQueue
 from tests.integration.test_documents_api import AMER, form, pdf_file
@@ -200,6 +201,7 @@ async def test_upload_queue_worker_search_end_to_end(
         app.dependency_overrides[get_storage] = lambda: storage
         app.dependency_overrides[get_job_queue] = lambda: sqs_queue
         app.dependency_overrides[get_embeddings] = lambda: FakeEmbeddings()
+        app.state.usage_limits = Unlimited()
         transport = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
             # 1. Upload: stored and queued, nothing embedded yet.

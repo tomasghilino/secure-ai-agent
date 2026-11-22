@@ -10,17 +10,31 @@ import uuid
 from datetime import date, datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Form, HTTPException, Response, UploadFile, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Response, UploadFile, status
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 
-from app.api.dependencies import JobQueueDep, SessionDep, SettingsDep, StorageDep, TenantDep
+from app.api.dependencies import (
+    JobQueueDep,
+    SessionDep,
+    SettingsDep,
+    StorageDep,
+    TenantDep,
+    require_role,
+)
 from app.database.models import IngestionJobRecord
 from app.ingestion.extraction import PDF_MAGIC
 from app.ingestion.jobs import VersionConflictError, submit_document
 from app.ingestion.pipeline import DocumentMetadata
+from app.tools.authorization import DOCUMENT_EDITOR_ROLES
 
-router = APIRouter(prefix="/v1", tags=["documents"])
+# Only knowledge-base editors add documents (OWASP LLM04, data poisoning): what the
+# agent and RAG treat as company policy must come from an accountable role.
+router = APIRouter(
+    prefix="/v1",
+    tags=["documents"],
+    dependencies=[Depends(require_role(DOCUMENT_EDITOR_ROLES, "manage documents"))],
+)
 
 
 class UploadForm(BaseModel):
@@ -62,6 +76,7 @@ class JobResponse(BaseModel):
     status_code=status.HTTP_202_ACCEPTED,
     responses={
         200: {"model": UploadResponse, "description": "The same file is already indexed"},
+        403: {"description": "The caller's role cannot manage documents"},
         409: {"description": "This version is already registered with a different file"},
         413: {"description": "The file is too large"},
         415: {"description": "The file is not a PDF"},
