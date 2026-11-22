@@ -1,5 +1,6 @@
 import pytest
 from pydantic import ValidationError
+from sqlalchemy.engine import make_url
 
 from app.core.config import Settings
 
@@ -90,6 +91,43 @@ def test_an_incomplete_jwt_setup_is_refused(
     monkeypatch: pytest.MonkeyPatch, override: dict[str, str], message: str
 ) -> None:
     for name, value in {**STAGING_AUTH, **override}.items():
+        monkeypatch.setenv(name, value)
+
+    with pytest.raises(ValidationError, match=message):
+        Settings(_env_file=None)  # type: ignore[call-arg]
+
+
+def test_the_jwks_can_be_given_inline(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name, value in STAGING_AUTH.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.delenv("AUTH_JWKS_URL", raising=False)
+    monkeypatch.setenv("AUTH_JWKS_JSON", '{"keys": []}')
+
+    assert Settings(_env_file=None).auth_jwks_json == '{"keys": []}'  # type: ignore[call-arg]
+
+
+def test_the_database_password_is_injected_into_the_url(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://app@db.internal:5432/northstar")
+    monkeypatch.setenv("DATABASE_PASSWORD", "p@ss:w/rd?#")  # characters a URL must escape
+
+    settings = Settings(_env_file=None)  # type: ignore[call-arg]
+
+    url = make_url(settings.database_url)
+    assert (url.username, url.password, url.host) == ("app", "p@ss:w/rd?#", "db.internal")
+    assert "p@ss:w/rd?#" not in repr(settings)  # a SecretStr never prints its value
+
+
+@pytest.mark.parametrize(
+    ("env", "message"),
+    [
+        ({"STORAGE_BACKEND": "s3", "STORAGE_BUCKET": "docs"}, "only allowed in staging"),
+        ({"STORAGE_BACKEND": "s3", "APP_ENV": "staging"}, "requires STORAGE_BUCKET"),
+    ],
+)
+def test_s3_storage_is_only_used_in_staging_with_a_bucket(
+    monkeypatch: pytest.MonkeyPatch, env: dict[str, str], message: str
+) -> None:
+    for name, value in {**STAGING_AUTH, "APP_ENV": "local", **env}.items():
         monkeypatch.setenv(name, value)
 
     with pytest.raises(ValidationError, match=message):

@@ -10,7 +10,7 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives import serialization
 
-from app.security.tokens import AccessDenied, InvalidToken, JwksFile, TokenVerifier
+from app.security.tokens import AccessDenied, InvalidToken, JwksDocument, TokenVerifier
 from app.tools.authorization import Principal
 from scripts.dev_token import DEV_AUDIENCE, DEV_ISSUER, generate_signing_key, mint, public_jwks
 
@@ -22,7 +22,7 @@ OTHER_KEY = generate_signing_key()  # not in our JWKS: an attacker's key
 def verifier(tmp_path_factory: pytest.TempPathFactory) -> TokenVerifier:
     jwks = tmp_path_factory.mktemp("auth") / "jwks.json"
     jwks.write_text(json.dumps(public_jwks(KEY)), encoding="utf-8")
-    return TokenVerifier(JwksFile(jwks), issuer=DEV_ISSUER, audience=DEV_AUDIENCE)
+    return TokenVerifier(JwksDocument.from_file(jwks), issuer=DEV_ISSUER, audience=DEV_AUDIENCE)
 
 
 def token(**overrides: object) -> str:
@@ -146,3 +146,67 @@ def test_required_claims_must_be_present(verifier: TokenVerifier) -> None:
 
 def token_kid() -> str:
     return str(jwt.get_unverified_header(token())["kid"])
+
+
+# --------------------------------------------------------------------------- Cognito access tokens
+
+COGNITO_ISSUER = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_Example"
+CLIENT_ID = "4example0client0id"
+
+
+@pytest.fixture(scope="module")
+def cognito_verifier() -> TokenVerifier:
+    return TokenVerifier(
+        JwksDocument(json.dumps(public_jwks(KEY))),
+        issuer=COGNITO_ISSUER,
+        audience=CLIENT_ID,
+        audience_claim="client_id",
+        tenant_claim="tenant_id",
+        roles_claim="cognito:groups",
+    )
+
+
+def cognito_token(**claims: object) -> str:
+    """The shape of a Cognito access token: no `aud`, the app client in `client_id`."""
+    now = datetime.now(UTC)
+    payload: dict[str, object] = {
+        "iss": COGNITO_ISSUER,
+        "sub": "3f1c6a52-0000-4000-8000-000000000001",
+        "client_id": CLIENT_ID,
+        "token_use": "access",
+        "tenant_id": "nsi-amer",
+        "cognito:groups": ["supervisor"],
+        "iat": now,
+        "exp": now + timedelta(minutes=30),
+    }
+    payload.update(claims)
+    payload = {k: v for k, v in payload.items() if v is not None}
+    return jwt.encode(payload, KEY, algorithm="RS256", headers={"kid": token_kid()})
+
+
+def test_a_cognito_access_token_becomes_the_principal(cognito_verifier: TokenVerifier) -> None:
+    principal = cognito_verifier.verify(cognito_token())
+
+    assert principal == Principal("nsi-amer", "3f1c6a52-0000-4000-8000-000000000001", "supervisor")
+
+
+@pytest.mark.parametrize(
+    "claims",
+    [
+        {"token_use": "id"},  # an ID token of the same client is not an API credential
+        {"token_use": None},
+        {"client_id": "another-app-client"},
+        {"client_id": None},
+        {"iss": "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_Other"},
+    ],
+)
+def test_cognito_tokens_for_another_client_or_use_are_refused(
+    cognito_verifier: TokenVerifier, claims: dict[str, object]
+) -> None:
+    with pytest.raises(InvalidToken):
+        cognito_verifier.verify(cognito_token(**claims))
+
+
+def test_the_standard_mode_still_requires_aud(verifier: TokenVerifier) -> None:
+    with pytest.raises(InvalidToken):
+        verifier.verify(cognito_token(iss=DEV_ISSUER, client_id=DEV_AUDIENCE))

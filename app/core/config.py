@@ -13,8 +13,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import make_url
 
 Environment = Literal["local", "test", "staging"]
 # fake    -> deterministic, offline, free (unit tests, CI)
@@ -51,11 +52,16 @@ class Settings(BaseSettings):
     # --- Authentication (ADR-0009) ---
     auth_mode: AuthMode = "dev_headers"
     auth_jwt_issuer: str | None = None  # exact `iss` expected
-    auth_jwt_audience: str | None = None  # exact `aud` expected (this API)
-    # Where the provider's public keys come from: its JWKS endpoint in deployed
-    # environments, or a local file in development (`make token` creates one).
+    auth_jwt_audience: str | None = None  # exact audience expected (this API's client)
+    # Claim that carries the audience. "aud" is the standard; Cognito access tokens carry
+    # the app client in "client_id" instead (and token_use=access), so they use that.
+    auth_audience_claim: Literal["aud", "client_id"] = "aud"
+    # Where the provider's public keys come from (exactly one): its JWKS endpoint in
+    # deployed environments, a local file in development (`make token` creates one), or
+    # the JWKS document itself, for a network that cannot reach the provider.
     auth_jwks_url: str | None = None
     auth_jwks_path: Path | None = None
+    auth_jwks_json: str | None = None
     auth_jwt_algorithms: list[str] = Field(default_factory=lambda: ["RS256"])
     # Claim names differ per provider (Cognito: "custom:tenant_id", "cognito:groups").
     auth_tenant_claim: str = "tenant_id"
@@ -70,6 +76,9 @@ class Settings(BaseSettings):
 
     # --- Database ---
     database_url: str = "postgresql+psycopg://northstar:northstar@localhost:5432/northstar"
+    # Set separately in deployed environments (injected from a secrets store), so the
+    # URL itself holds no secret; it replaces any password in DATABASE_URL.
+    database_password: SecretStr | None = None
 
     # --- Model providers ---
     llm_provider: Provider = "fake"
@@ -90,8 +99,10 @@ class Settings(BaseSettings):
     bedrock_embedding_model_id: str = "amazon.titan-embed-text-v2:0"
 
     # --- Uploads, object storage and queue (ADR-0003) ---
-    # Uploaded PDFs: a local directory in development, S3 in staging (planned).
+    # Uploaded PDFs: a local directory in development and tests, S3 in staging.
+    storage_backend: Literal["local", "s3"] = "local"
     storage_root: Path = Path("data/storage")
+    storage_bucket: str | None = None
     # Unset = real SQS. Only staging may use it: local and test always talk to ElasticMQ,
     # so a development machine never sends messages to AWS by accident.
     sqs_endpoint_url: str | None = None
@@ -173,8 +184,12 @@ class Settings(BaseSettings):
             return self
         if not self.auth_jwt_issuer or not self.auth_jwt_audience:
             raise ValueError("AUTH_MODE=jwt requires AUTH_JWT_ISSUER and AUTH_JWT_AUDIENCE")
-        if (self.auth_jwks_url is None) == (self.auth_jwks_path is None):
-            raise ValueError("AUTH_MODE=jwt requires exactly one of AUTH_JWKS_URL, AUTH_JWKS_PATH")
+        sources = [self.auth_jwks_url, self.auth_jwks_path, self.auth_jwks_json]
+        if sum(source is not None for source in sources) != 1:
+            raise ValueError(
+                "AUTH_MODE=jwt requires exactly one of AUTH_JWKS_URL, AUTH_JWKS_PATH, "
+                "AUTH_JWKS_JSON"
+            )
         if self.auth_jwks_url is not None and not self.auth_jwks_url.startswith("https://"):
             raise ValueError("AUTH_JWKS_URL must use https")
         algorithms = set(self.auth_jwt_algorithms)
@@ -188,6 +203,25 @@ class Settings(BaseSettings):
     def _local_queue_endpoint(self) -> Settings:
         if self.app_env != "staging" and self.sqs_endpoint_url is None:
             self.sqs_endpoint_url = LOCAL_SQS_ENDPOINT
+        return self
+
+    @model_validator(mode="after")
+    def _object_storage(self) -> Settings:
+        # Like the queue: a development machine or a test never writes to AWS by accident.
+        if self.storage_backend == "s3":
+            if self.app_env != "staging":
+                raise ValueError("STORAGE_BACKEND=s3 is only allowed in staging")
+            if not self.storage_bucket:
+                raise ValueError("STORAGE_BACKEND=s3 requires STORAGE_BUCKET")
+        return self
+
+    @model_validator(mode="after")
+    def _database_password(self) -> Settings:
+        if self.database_password is not None:
+            url = make_url(self.database_url).set(
+                password=self.database_password.get_secret_value()
+            )
+            self.database_url = url.render_as_string(hide_password=False)
         return self
 
 
