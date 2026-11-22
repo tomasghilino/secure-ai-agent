@@ -3,7 +3,7 @@
 # Windows (cmd.exe). Run `make help` to list targets.
 
 .DEFAULT_GOAL := help
-.PHONY: help setup data dev up down migrate migration seed ingest worker search ask agent approve mcp token eval-retrieval eval-answers llm-up llm-pull test test-integration test-llm lint format typecheck check
+.PHONY: help setup data dev up down migrate migration seed ingest worker search ask agent approve mcp token eval-retrieval eval-answers eval-security llm-up llm-pull test test-integration test-llm lint format typecheck check
 
 OLLAMA_CHAT_MODEL ?= qwen3:8b
 OLLAMA_EMBEDDING_MODEL ?= qwen3-embedding:0.6b
@@ -69,6 +69,9 @@ eval-retrieval: ## Retrieval metrics (dense vs keyword vs hybrid) on data/evalua
 
 eval-answers: ## Answer checks (citations, refusals) on data/evaluation with the chat model
 	uv run python -m scripts.evaluate_answers
+
+eval-security: ## AI red-team suite against the agent (injection, cross-tenant, tool abuse...)
+	uv run python -m scripts.evaluate_security
 
 llm-up: ## Start local Ollama on the NVIDIA GPU (compose profile `llm`)
 	docker compose --profile llm up -d --wait ollama
