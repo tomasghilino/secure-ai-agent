@@ -1421,7 +1421,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
-    { name = "types-boto3", extra = ["bedrock-runtime", "s3", "sqs"] },
+    { name = "types-boto3", extra = ["bedrock-runtime", "cognito-idp", "ecs", "s3", "sqs"] },
     { name = "types-pyyaml" },
 ]
 
@@ -1460,7 +1460,7 @@ dev = [
     { name = "pytest", specifier = ">=9.2" },
     { name = "pytest-asyncio", specifier = ">=1.4.1.post1" },
     { name = "ruff", specifier = ">=0.17" },
-    { name = "types-boto3", extras = ["bedrock-runtime", "s3", "sqs"], specifier = ">=1.44.6" },
+    { name = "types-boto3", extras = ["bedrock-runtime", "cognito-idp", "ecs", "s3", "sqs"], specifier = ">=1.44.6" },
     { name = "types-pyyaml", specifier = ">=6.0.12.20261103" },
 ]
 
@@ -1588,6 +1588,12 @@ wheels = [
 bedrock-runtime = [
     { name = "types-boto3-bedrock-runtime" },
 ]
+cognito-idp = [
+    { name = "types-boto3-cognito-idp" },
+]
+ecs = [
+    { name = "types-boto3-ecs" },
+]
 s3 = [
     { name = "types-boto3-s3" },
 ]
@@ -1602,6 +1608,24 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a8/a1/b7836f7dd5f038caf8bff0662da7d6ab78918ff1189cd72d89a9bc481776/types_boto3_bedrock_runtime-1.44.0.tar.gz", hash = "sha256:7f24b0041ec675d5b00222cb1686b8d0c7195987b989d1a08a496dd41c68fcc6", size = 31657, upload-time = "2026-11-10T22:42:50.324Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5c/5b/f4912dd79eb6527d4d11a84c48bec6cfb592be8d2db60ba3b2a0104e15bc/types_boto3_bedrock_runtime-1.44.0-py3-none-any.whl", hash = "sha256:eea965a6a30bd63253f8ddd90c3c935fae1e85e21055d66070388825bdd437dd", size = 37939, upload-time = "2026-11-10T22:42:48.045Z" },
+]
+
+[[package]]
+name = "types-boto3-cognito-idp"
+version = "1.44.7"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/7f/cd/93fa50f3bc7a5d598822734ec569fa01037a3d9ab697604840ec790b540a/types_boto3_cognito_idp-1.44.7.tar.gz", hash = "sha256:959e2f09da83a54c82e85f6f4d0ceaf93e2b4b4558c662f1817298b6a0370932", size = 62696, upload-time = "2026-11-20T00:01:28.446Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/ec/bc/ba99473a44444dc7b0b81311992a6210d9895e2f7ad16b4059a8f0a7f0f7/types_boto3_cognito_idp-1.44.7-py3-none-any.whl", hash = "sha256:1e06fcf9a379d9056d1fc1ced89314cdbfe1c6269fec022bf5ee02f56c969711", size = 69413, upload-time = "2026-11-20T00:01:26.516Z" },
+]
+
+[[package]]
+name = "types-boto3-ecs"
+version = "1.44.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/85/42/1ac4e246356e7ff93a7ddfed9c695014204fd585060f8ddfade131544218/types_boto3_ecs-1.44.4.tar.gz", hash = "sha256:f6c57a997b63753c394931972853ac2bfcb38825c29c2739460477fc06c8bf0f", size = 69935, upload-time = "2026-11-17T03:06:58.015Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/87/58/92d0a5b2c7ea61ab9838c592f9f4c18cb6833bb8c134505a10d58e03f653/types_boto3_ecs-1.44.4-py3-none-any.whl", hash = "sha256:6b51c916590173cb451879f5d77ce5b21594af705969af3c6104003369105d48", size = 79518, upload-time = "2026-11-17T03:06:55.814Z" },
 ]
 
 [[package]]

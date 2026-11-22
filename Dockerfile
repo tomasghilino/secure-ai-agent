@@ -2,6 +2,7 @@
 # Multi-stage image:
 #   dev      hot reload and dev tools; the source is bind-mounted by docker compose
 #   runtime  production: Python, the locked dependencies and the code, nothing else
+#   ops      runtime + the seeding scripts and source data, for one-off admin tasks
 # Base images are pinned by digest (Dependabot proposes updates), so a rebuild never pulls
 # a different image than the one that was scanned.
 
@@ -62,3 +63,17 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=20s --retries=3 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-server-header"]
+
+# --- Ops: one-off administrative tasks (migrations, seeding), same hardening as runtime ---
+FROM deps AS ops-deps
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --locked --no-dev --group datagen
+
+FROM runtime AS ops
+USER root
+COPY --from=ops-deps /opt/venv /opt/venv
+COPY scripts ./scripts
+COPY data/source ./data/source
+RUN python -m compileall -q scripts
+USER app
+CMD ["alembic", "upgrade", "head"]

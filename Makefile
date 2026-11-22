@@ -3,7 +3,7 @@
 # Windows (cmd.exe). Run `make help` to list targets.
 
 .DEFAULT_GOAL := help
-.PHONY: help setup data dev up down migrate migration seed ingest worker search ask agent approve mcp token eval-retrieval eval-answers eval-security llm-up llm-pull test test-integration test-llm lint format typecheck check image scan
+.PHONY: help setup data dev up down migrate migration seed ingest worker search ask agent approve mcp token eval-retrieval eval-answers eval-security llm-up llm-pull test test-integration test-llm lint format typecheck check image scan tf-check staging-plan staging-images
 
 OLLAMA_CHAT_MODEL ?= qwen3:8b
 OLLAMA_EMBEDDING_MODEL ?= qwen3-embedding:0.6b
@@ -115,5 +115,29 @@ scan: image ## Security scans as in CI: secrets in history, dependency CVEs, mis
 	docker run --rm -v "$(CURDIR):/repo" $(GITLEAKS_IMAGE) git /repo --redact --no-banner
 	uv export --frozen --no-dev --no-emit-project --quiet --output-file reports/requirements.txt
 	uvx pip-audit@2.10.1 --requirement reports/requirements.txt --require-hashes --disable-pip --strict
-	docker run --rm -v "$(CURDIR):/src:ro" -v trivy-cache:/root/.cache/ $(TRIVY_IMAGE) fs --quiet --scanners misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --skip-dirs /src/.venv --skip-dirs /src/.auth --skip-dirs /src/notes --skip-dirs /src/reports /src
+	docker run --rm -v "$(CURDIR):/src:ro" -v trivy-cache:/root/.cache/ $(TRIVY_IMAGE) fs --quiet --scanners misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --skip-dirs /src/.venv --skip-dirs /src/.auth --skip-dirs /src/notes --skip-dirs /src/reports --skip-dirs /src/infra/terraform/.terraform /src
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v trivy-cache:/root/.cache/ $(TRIVY_IMAGE) image --quiet --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 $(IMAGE)
+
+# --- AWS staging (Terraform). Plans and applies need an AWS login; see docs/operations/staging.md
+TF := terraform -chdir=infra/terraform
+# Evaluated only by the targets that use them.
+STAGING_REPOSITORY = $(shell $(TF) output -raw ecr_repository_url)
+STAGING_TAG = $(shell git rev-parse --short=12 HEAD)
+
+tf-check: ## Terraform format and validation (no AWS access needed)
+	$(TF) fmt -check -recursive
+	$(TF) init -backend=false -input=false
+	$(TF) validate
+
+staging-plan: ## Show what applying would change in AWS staging (needs an AWS login; changes nothing)
+	$(TF) init -input=false
+	$(TF) plan -out=staging.tfplan
+
+staging-images: ## Build, scan and push the runtime and ops images (tag = current commit)
+	docker build --target runtime -t $(STAGING_REPOSITORY):$(STAGING_TAG) .
+	docker build --target ops -t $(STAGING_REPOSITORY):ops-$(STAGING_TAG) .
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v trivy-cache:/root/.cache/ $(TRIVY_IMAGE) image --quiet --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 $(STAGING_REPOSITORY):$(STAGING_TAG)
+	aws ecr get-login-password | docker login --username AWS --password-stdin $(firstword $(subst /, ,$(STAGING_REPOSITORY)))
+	docker push $(STAGING_REPOSITORY):$(STAGING_TAG)
+	docker push $(STAGING_REPOSITORY):ops-$(STAGING_TAG)
+	@echo Pushed $(STAGING_TAG): set image_tag = "$(STAGING_TAG)" in infra/terraform/terraform.tfvars

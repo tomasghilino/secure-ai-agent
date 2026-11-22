@@ -39,7 +39,7 @@ dev = [
     "pytest>=9.2",
     "pytest-asyncio>=1.4.1.post1",
     "ruff>=0.17",
-    "types-boto3[bedrock-runtime,s3,sqs]>=1.44.6",
+    "types-boto3[bedrock-runtime,cognito-idp,ecs,s3,sqs]>=1.44.6",
     "types-pyyaml>=6.0.12.20261103",
 ]
 
