@@ -32,7 +32,9 @@ from app.core.logging import get_logger
 log = get_logger(__name__)
 
 REQUEST_ID_HEADER = "X-Request-ID"
-_SAFE_REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{8,64}$")
+# Includes "=": API Gateway request IDs are base64-like ("HREdzhlCIAMEVHQ="), and staging
+# overwrites the client value with the gateway's, so both log layers share one ID.
+_SAFE_REQUEST_ID = re.compile(r"^[A-Za-z0-9._=-]{8,64}$")
 # The interactive API docs load scripts and styles from a CDN; everything else loads nothing.
 DOCS_PATHS = frozenset({"/docs", "/docs/oauth2-redirect", "/redoc", "/openapi.json"})
 

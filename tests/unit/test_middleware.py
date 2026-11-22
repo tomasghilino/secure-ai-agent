@@ -76,6 +76,13 @@ async def test_an_unsafe_request_id_is_replaced() -> None:
     assert len(response.headers["X-Request-ID"]) == 32
 
 
+async def test_an_api_gateway_request_id_is_kept() -> None:
+    async with client(build_app()) as http:
+        response = await http.get("/ok", headers={"X-Request-ID": "HREdzhlCIAMEVHQ="})
+
+    assert response.headers["X-Request-ID"] == "HREdzhlCIAMEVHQ="
+
+
 async def test_validation_errors_do_not_echo_the_submitted_value() -> None:
     async with client(build_app()) as http:
         response = await http.post("/secret", json={"api_key": "sk_live_DO_NOT_LEAK"})
