@@ -27,13 +27,13 @@ Calculator before applying.
 
 | Resource | Rate | Per hour |
 | --- | --- | --- |
-| 7 interface VPC endpoints, one AZ | USD 0.01 per endpoint-hour | 0.070 |
+| 6–7 interface VPC endpoints, one AZ (Bedrock's only with Bedrock providers) | USD 0.01 per endpoint-hour | 0.060–0.070 |
 | Fargate API task (0.5 vCPU, 1 GB) | 0.04048 per vCPU-hour + 0.004445 per GB-hour | 0.025 |
 | Fargate worker task (0.25 vCPU, 1 GB) | same | 0.015 |
 | RDS `db.t4g.micro`, single-AZ, 20 GB gp3 | 0.016 per hour + storage | 0.019 |
 | KMS key, database secret, registry storage | monthly fees, prorated | 0.002 |
 | API Gateway, SQS, S3, Lambda, logs, Cognito (Essentials free tier) | per request / GB | ~0 at demo volume |
-| **Total, idle** | | **~0.13** |
+| **Total, idle** | | **~0.12–0.13** |
 
 Bedrock tokens come on top (ADR-0004: about USD 0.75 for a generous evaluation). A Cloud
 Map namespace creates a Route 53 private hosted zone, free if deleted within 12 hours.

@@ -180,9 +180,12 @@ resource "aws_vpc_security_group_egress_rule" "workload_to_s3" {
 # --- VPC endpoints ---
 
 locals {
-  # Cognito's endpoint only serves the JWKS when the keys are not given inline.
+  # Bedrock's endpoint only when a model provider uses it; Cognito's only to serve the
+  # JWKS when the keys are not given inline. Each interface endpoint is billed by the hour.
+  uses_bedrock = var.llm_provider == "bedrock" || var.embedding_provider == "bedrock"
   interface_endpoints = toset(concat(
-    ["ecr.api", "ecr.dkr", "logs", "secretsmanager", "sqs", "bedrock-runtime"],
+    ["ecr.api", "ecr.dkr", "logs", "secretsmanager", "sqs"],
+    local.uses_bedrock ? ["bedrock-runtime"] : [],
     var.auth_jwks_json == null ? ["cognito-idp"] : [],
   ))
 
