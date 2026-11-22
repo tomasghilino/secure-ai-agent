@@ -13,13 +13,18 @@
   (interrupt/resume with a PostgreSQL checkpointer) and an append-only audit log
 - Read-only MCP server with client-side tool pinning
 - Threat model mapped to the OWASP Top 10 for LLM, agentic and MCP applications
+- JWT authentication with roles from claims; an editor role for the knowledge base
+- Per-user rate limits and per-tenant daily token budgets (atomic counters in PostgreSQL)
+- Request IDs, security headers and error responses that reveal nothing
+- AI red-team suite (17 attacks) in CI; eligibility rules enforced in code at proposal and
+  approval
+- CI: lint, types, unit and integration tests, gitleaks, pip-audit, Trivy, SBOM,
+  actionlint; actions pinned by SHA, images by digest; Dependabot
+- Hardened production image (non-root, read-only root filesystem, no package manager)
 
 ## Next
 
-- JWT authentication with roles from claims; rate limits and per-tenant token budgets
-- AI red-team evaluation (prompt injection, cross-tenant probing, tool abuse)
-- CI: lint, types and tests, plus `pip-audit`, `gitleaks`, Trivy and an SBOM
-- Hardened production container
-- Terraform for an ephemeral AWS staging on Amazon Bedrock: least-privilege IAM, OIDC for
-  CI, encryption at rest, VPC endpoints
-- Faithfulness evaluation (Ragas or an LLM judge) and tracing
+- Red-team and faithfulness results with real models (Qwen3 locally, Claude on Bedrock)
+- Terraform for an ephemeral AWS staging on Amazon Bedrock: Cognito as the JWT issuer,
+  least-privilege IAM, OIDC for CI, encryption at rest, VPC endpoints, WAF rate limiting
+- Tracing (OpenTelemetry or Langfuse) correlated with the request ID

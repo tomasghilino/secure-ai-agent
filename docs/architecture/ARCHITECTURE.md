@@ -192,6 +192,7 @@ erDiagram
 
 | Threat | Control |
 | --- | --- |
+| Forged identity | JWT verified against the provider's JWKS (asymmetric algorithms, issuer, audience, expiry); one role from claims |
 | Cross-tenant data leak | Tenant from verified JWT only; tenant filter in every query; PostgreSQL RLS |
 | Unauthorized document access | Classification × role check applied inside the retrieval SQL |
 | Prompt injection via documents | Retrieved text wrapped as delimited *untrusted data*; system prompt states it is never instructions; tools authorized in code |
@@ -201,6 +202,9 @@ erDiagram
 | Secret leakage | No secrets in code/env files; AWS via SSO profile locally, IAM task role in AWS; log redaction |
 | Cost abuse | Max output tokens, max agent steps, per-tenant daily token budget, rate limits |
 | Lack of traceability | Audit log for tool calls and approvals; Langfuse traces |
+| Supply chain | CI: gitleaks, pip-audit, Trivy, SBOM; actions pinned by SHA, images by digest; hardened non-root runtime image |
+
+Full threat model, test evidence and residual risks: [THREAT_MODEL.md](../security/THREAT_MODEL.md).
 
 ## 8. Local vs AWS staging
 
