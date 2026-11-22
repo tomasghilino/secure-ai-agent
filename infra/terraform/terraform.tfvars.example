@@ -1,0 +1,16 @@
+# Copy to terraform.tfvars (ignored by git) and fill in. Never commit account IDs.
+
+allowed_account_id = "123456789012"
+aws_profile        = "my-sso-profile"
+
+# Leave unset for the first apply (registry, network, database, identity); set it to the
+# pushed image tag (the Git commit) to create the ECS services.
+# image_tag = "0123abc"
+
+# "fake" exercises the whole infrastructure without Bedrock access or cost.
+# llm_provider       = "bedrock"
+# embedding_provider = "bedrock"
+
+# GitHub Actions image pushes through OIDC (optional).
+# github_repository           = "owner/secure-ai-agent"
+# create_github_oidc_provider = true
