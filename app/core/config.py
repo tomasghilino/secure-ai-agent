@@ -132,6 +132,14 @@ class Settings(BaseSettings):
     # Qwen3 8B read "days_since_delivery: 40" as inside a 30-day window; with it, correct.
     agent_reasoning: bool = True
 
+    # Return window per tenant, in days: the enforced copy of each tenant's active
+    # returns policy (NSI-POL-RET-003 v3.0, NSI-EU-POL-RET-001 v1.2); a test checks they
+    # agree. The documents explain the rule, this setting enforces it in code, even if
+    # the model and the approver both miss it. No entry: no returns for that tenant.
+    return_window_days: dict[str, int] = Field(
+        default_factory=lambda: {"nsi-amer": 30, "nsi-emea": 21}
+    )
+
     # --- MCP server (`make mcp`): the one identity every tool call runs as ---
     # Fixed at launch, never taken from the model or the client (no confused deputy).
     mcp_tenant_id: str | None = Field(default=None, pattern=r"^[a-z0-9-]{1,64}$")

@@ -249,6 +249,7 @@ class AgentService:
             principal=principal,
             today=self._settings.agent_reference_date or date.today(),
             retrieval_mode=self._settings.rag_retrieval_mode,
+            return_window_days=self._settings.return_window_days.get(principal.tenant_id),
         )
 
     @asynccontextmanager

@@ -60,7 +60,9 @@ def service(
             embeddings=FakeEmbeddings(),
             model=model,
             checkpointer=checkpointer,
-            settings=Settings(_env_file=None, agent_reference_date=REFERENCE_DATE, **settings),  # type: ignore[call-arg]
+            settings=Settings(  # type: ignore[call-arg]
+                _env_file=None, **{"agent_reference_date": REFERENCE_DATE, **settings}
+            ),
         )
 
     return make
@@ -254,22 +256,68 @@ async def test_a_decision_is_applied_once(service: ServiceFactory) -> None:
         await agent.decide(SUPERVISOR, paused.thread_id, approved=True, comment=None)
 
 
-async def test_an_injected_instruction_can_at_most_create_a_proposal(
+async def test_an_injected_return_never_reaches_a_supervisor(
     service: ServiceFactory, seeded: async_sessionmaker[AsyncSession]
 ) -> None:
     # Worst case: ticket T-5009 tells the model to request a return, and the model obeys.
+    # SO-2026-0102 is a build-to-order pump: the rules in code refuse the proposal, so not
+    # even a careless approver could execute it (found by the red-team suite).
     model = script(
         asks(call("get_ticket", ticket_number="T-5009")),
         proposes_return("SO-2026-0102"),
+        AIMessage("I cannot request a return for this order."),
     )
 
     run = await service(model).start(SUPPORT, "Summarise ticket T-5009")
 
-    assert run.status == "awaiting_approval"  # a person still has to say yes
-    assert run.pending_action is not None
-    [line] = run.pending_action["facts"]["lines"]
-    assert line["product_returnable"] is False  # the approver sees the real facts
+    assert run.status == "completed"
+    assert run.pending_action is None
+    assert ("request_return_authorization", "error") in [(c.tool, c.status) for c in run.tool_calls]
+    assert ("action_proposed", "request_return_authorization", "error") in await audit(seeded)
     assert await return_authorizations(seeded) == []
+
+
+@pytest.mark.parametrize(
+    ("order_number", "reason"),
+    [
+        ("SO-2026-0103", "outside the 30-day return window"),  # delivered 40 days ago
+        ("SO-2026-0107", "not returnable"),  # one line was sold as final sale
+    ],
+)
+async def test_returns_outside_the_rules_are_refused_in_code(
+    service: ServiceFactory,
+    seeded: async_sessionmaker[AsyncSession],
+    order_number: str,
+    reason: str,
+) -> None:
+    model = script(proposes_return(order_number), AIMessage("Not possible."))
+
+    run = await service(model).start(SUPPORT, f"Create a return authorization for {order_number}")
+
+    assert run.status == "completed"
+    assert run.pending_action is None
+    async with seeded() as session:
+        detail = await session.scalar(
+            select(AuditEventRecord.detail).where(AuditEventRecord.event_type == "action_proposed")
+        )
+    assert detail is not None and reason in detail
+
+
+async def test_the_rules_are_checked_again_when_the_supervisor_decides(
+    service: ServiceFactory, seeded: async_sessionmaker[AsyncSession]
+) -> None:
+    paused = await service(script(proposes_return())).start(SUPPORT, "Return SO-2026-0101")
+    assert paused.status == "awaiting_approval"  # 12 days after delivery: eligible
+
+    # The approval arrives late: 47 days after delivery, outside the window.
+    late = service(
+        script(AIMessage("The window has passed.")), agent_reference_date=date(2026, 12, 20)
+    )
+    done = await late.decide(SUPERVISOR, paused.thread_id, approved=True, comment="ok")
+
+    assert done.status == "completed"
+    assert await return_authorizations(seeded) == []
+    assert ("action_executed", "request_return_authorization", "error") in await audit(seeded)
 
 
 # --------------------------------------------------------------------------- database controls
