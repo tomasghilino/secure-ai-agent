@@ -3,10 +3,16 @@
 # Windows (cmd.exe). Run `make help` to list targets.
 
 .DEFAULT_GOAL := help
-.PHONY: help setup data dev up down migrate migration seed ingest worker search ask agent approve mcp token eval-retrieval eval-answers eval-security llm-up llm-pull test test-integration test-llm lint format typecheck check
+.PHONY: help setup data dev up down migrate migration seed ingest worker search ask agent approve mcp token eval-retrieval eval-answers eval-security llm-up llm-pull test test-integration test-llm lint format typecheck check image scan
 
 OLLAMA_CHAT_MODEL ?= qwen3:8b
 OLLAMA_EMBEDDING_MODEL ?= qwen3-embedding:0.6b
+# Git Bash would rewrite container paths such as /repo into Windows paths.
+export MSYS_NO_PATHCONV := 1
+# Security scanners, pinned by digest (same images as CI).
+GITLEAKS_IMAGE := ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+TRIVY_IMAGE := ghcr.io/aquasecurity/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+IMAGE ?= secure-ai-agent:local
 # Development identity for `make agent`, `make mcp` and `make token`.
 tenant ?= nsi-amer
 role ?= support_agent
@@ -101,3 +107,13 @@ typecheck: ## Static type checking (mypy --strict)
 	uv run mypy
 
 check: lint typecheck test ## Everything CI runs locally
+
+image: ## Build the hardened production image (Dockerfile target `runtime`)
+	docker build --target runtime -t $(IMAGE) .
+
+scan: image ## Security scans as in CI: secrets in history, dependency CVEs, misconfigurations, image CVEs
+	docker run --rm -v "$(CURDIR):/repo" $(GITLEAKS_IMAGE) git /repo --redact --no-banner
+	uv export --frozen --no-dev --no-emit-project --quiet --output-file reports/requirements.txt
+	uvx pip-audit@2.10.1 --requirement reports/requirements.txt --require-hashes --disable-pip --strict
+	docker run --rm -v "$(CURDIR):/src:ro" -v trivy-cache:/root/.cache/ $(TRIVY_IMAGE) fs --quiet --scanners misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --skip-dirs /src/.venv --skip-dirs /src/.auth --skip-dirs /src/notes --skip-dirs /src/reports /src
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v trivy-cache:/root/.cache/ $(TRIVY_IMAGE) image --quiet --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 $(IMAGE)
