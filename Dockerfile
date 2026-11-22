@@ -5,7 +5,7 @@
 # Base images are pinned by digest (Dependabot proposes updates), so a rebuild never pulls
 # a different image than the one that was scanned.
 
-ARG PYTHON_IMAGE=python:3.12-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df
+ARG PYTHON_IMAGE=python:3.12-slim-trixie@sha256:5e2bdb1b0d542d5039cffb8181c65930093949194a65c365dfb1b0fe13a4fa5b
 
 FROM ghcr.io/astral-sh/uv:0.13.7@sha256:96f40d3904aad8d0bd010539001d36c8e2188b981e1334471a90c4a1d93bb490 AS uv
 
@@ -39,10 +39,14 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 WORKDIR /app
-# A system user without a shell or home; setuid/setgid bits removed from every binary and
+# Debian security updates applied at build time (the base digest only moves weekly). Then
+# a system user without a shell or home; setuid/setgid bits removed from every binary and
 # pip uninstalled, so nothing in the image can raise privileges or install packages, even
 # if the process is compromised.
-RUN groupadd --system --gid 10001 app \
+RUN apt-get update \
+    && apt-get upgrade --yes --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 10001 app \
     && useradd --system --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app \
     && find / -xdev -perm /6000 -type f -exec chmod a-s {} + \
     && mkdir -p /app/data/storage && chown app:app /app/data/storage \
