@@ -22,6 +22,7 @@ env:
   GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
   TRIVY_IMAGE: ghcr.io/aquasecurity/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
   ACTIONLINT_IMAGE: rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+  TERRAFORM_IMAGE: hashicorp/terraform:1.17.1@sha256:a5d5a5a892c98f60fcbfa81eac2a40fc19e7b3fa7719bccae10ff6111d22524a
 
 jobs:
   quality:
@@ -111,6 +112,23 @@ jobs:
           name: sbom
           path: sbom.cdx.json
           retention-days: 30
+
+  terraform:
+    name: Terraform format and validation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # No backend and no credentials: providers come from the committed lock file.
+      # Misconfigurations are scanned by Trivy in the supply-chain job.
+      - name: Format, initialize, validate
+        run: |
+          tf() { docker run --rm -v "$PWD/infra/terraform:/tf" -w /tf "$TERRAFORM_IMAGE" "$@"; }
+          tf fmt -check -recursive
+          tf init -backend=false -input=false -lockfile=readonly
+          tf validate
 
   workflows:
     name: Lint GitHub Actions workflows
