@@ -23,7 +23,7 @@ x-app-service: &app-service
 
 services:
   db:
-    image: pgvector/pgvector:0.8.7-pg17
+    image: pgvector/pgvector:0.8.7-pg17@sha256:b513c48566e4777cd3370451400000c78eda6a08131d68f4c31d4a76f27bd8fd
     environment:
       POSTGRES_USER: northstar
       POSTGRES_PASSWORD: northstar
@@ -40,7 +40,7 @@ services:
 
   sqs:
     # SQS-compatible API: same boto3 code path locally and on AWS (only endpoint_url differs).
-    image: softwaremill/elasticmq-native:1.7.1
+    image: softwaremill/elasticmq-native:1.7.1@sha256:e4580ab9ad1bd5cd37b4ba04911bc5ccc8cd2d9ab4de56ece65acee71c24e05c
     ports:
       - "9324:9324" # SQS API
       - "9325:9325" # stats UI
@@ -50,7 +50,7 @@ services:
   ollama:
     # Local LLM + embedding runtime on the host's NVIDIA GPU. Opt-in profile so machines
     # without a GPU can still run the stack with fake providers: `docker compose --profile llm up`.
-    image: ollama/ollama:0.40.14
+    image: ollama/ollama:0.40.14@sha256:ebaef4f4c5d93660e1f25f8ad085a112f51ccfb0e8458073e71793959dba91c9
     profiles: ["llm"]
     ports:
       - "11434:11434"
