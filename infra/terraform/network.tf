@@ -196,6 +196,23 @@ locals {
   caller_only_endpoints  = toset(["ecr.api", "ecr.dkr", "bedrock-runtime"])
 }
 
+# Not every service has endpoints in every AZ (Cognito's skip some): each endpoint goes in
+# the first private subnet whose AZ the service supports.
+data "aws_vpc_endpoint_service" "interface" {
+  for_each = local.interface_endpoints
+
+  service_name = "com.amazonaws.${var.region}.${each.key}"
+}
+
+locals {
+  endpoint_subnet = {
+    for service, details in data.aws_vpc_endpoint_service.interface : service => [
+      for subnet in aws_subnet.private : subnet.id
+      if contains(details.availability_zones, subnet.availability_zone)
+    ][0]
+  }
+}
+
 resource "aws_vpc_endpoint" "interface" {
   for_each = local.interface_endpoints
 
@@ -203,7 +220,7 @@ resource "aws_vpc_endpoint" "interface" {
   service_name      = "com.amazonaws.${var.region}.${each.key}"
   vpc_endpoint_type = "Interface"
   # One subnet: endpoints are billed per AZ-hour, and staging accepts losing one AZ.
-  subnet_ids          = [aws_subnet.private[0].id]
+  subnet_ids          = [local.endpoint_subnet[each.key]]
   security_group_ids  = [aws_security_group.endpoints.id]
   private_dns_enabled = true
 

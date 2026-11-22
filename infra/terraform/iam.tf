@@ -122,10 +122,8 @@ data "aws_iam_policy_document" "chat" {
     content {
       sid     = "ChatModelThroughTheProfileOnly"
       actions = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
-      resources = [
-        "arn:${local.partition}:bedrock:*::foundation-model/${local.chat_base_model_id}*",
-        "arn:${local.partition}:bedrock:::foundation-model/${local.chat_base_model_id}*",
-      ]
+      # "*" as the Region also matches the empty Region of global inference profiles.
+      resources = ["arn:${local.partition}:bedrock:*::foundation-model/${local.chat_base_model_id}*"]
       condition {
         test     = "StringEquals"
         variable = "bedrock:InferenceProfileArn"

@@ -10,8 +10,9 @@ resource "aws_db_parameter_group" "postgres" {
   family = "postgres17"
 
   parameter {
-    name  = "rds.force_ssl"
-    value = "1"
+    name         = "rds.force_ssl"
+    value        = "1"
+    apply_method = "pending-reboot" # static parameter; in effect from creation
   }
   parameter {
     name  = "log_connections"

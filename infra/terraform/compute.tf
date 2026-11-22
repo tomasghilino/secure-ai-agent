@@ -77,14 +77,18 @@ locals {
     valueFrom = "${aws_db_instance.main.master_user_secret[0].secret_arn}:password::"
   }]
 
+  # Empty lists are written out because ECS stores them: otherwise every plan would
+  # show a difference and replace the task definitions.
   hardening = {
     readonlyRootFilesystem = true
     user                   = "10001:10001"
     privileged             = false
     linuxParameters = {
-      capabilities       = { drop = ["ALL"] }
+      capabilities       = { add = [], drop = ["ALL"] }
       initProcessEnabled = true
     }
+    systemControls = []
+    volumesFrom    = []
     # Fargate has no tmpfs: /tmp is an ephemeral task volume (the root stays read-only).
     mountPoints = [{ sourceVolume = "tmp", containerPath = "/tmp", readOnly = false }]
   }
@@ -156,12 +160,13 @@ resource "aws_ecs_task_definition" "worker" {
   }
 
   container_definitions = jsonencode([merge(local.hardening, {
-    name        = "worker"
-    image       = "${local.repository_url}:${var.image_tag}"
-    essential   = true
-    command     = ["python", "-m", "app.ingestion.worker"]
-    environment = local.environment
-    secrets     = local.secrets
+    name         = "worker"
+    image        = "${local.repository_url}:${var.image_tag}"
+    essential    = true
+    command      = ["python", "-m", "app.ingestion.worker"]
+    portMappings = []
+    environment  = local.environment
+    secrets      = local.secrets
     logConfiguration = {
       logDriver = "awslogs"
       options = {
@@ -195,12 +200,13 @@ resource "aws_ecs_task_definition" "ops" {
   }
 
   container_definitions = jsonencode([merge(local.hardening, {
-    name        = "ops"
-    image       = "${local.repository_url}:ops-${var.image_tag}"
-    essential   = true
-    command     = ["alembic", "upgrade", "head"]
-    environment = local.environment
-    secrets     = local.secrets
+    name         = "ops"
+    image        = "${local.repository_url}:ops-${var.image_tag}"
+    essential    = true
+    command      = ["alembic", "upgrade", "head"]
+    portMappings = []
+    environment  = local.environment
+    secrets      = local.secrets
     logConfiguration = {
       logDriver = "awslogs"
       options = {

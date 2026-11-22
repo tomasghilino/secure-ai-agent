@@ -52,7 +52,7 @@ data "aws_iam_policy_document" "kms" {
       identifiers = ["logs.${var.region}.amazonaws.com"]
     }
     condition {
-      test     = "ArnLike"
+      test     = "StringLike" # the context key is a string (IAM Access Analyzer)
       variable = "kms:EncryptionContext:aws:logs:arn"
       values   = ["arn:${local.partition}:logs:${var.region}:${local.account_id}:log-group:*${local.name}*"]
     }
