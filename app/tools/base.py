@@ -44,6 +44,9 @@ class ToolContext:
     principal: Principal
     today: date
     retrieval_mode: Mode = "hybrid"
+    # The tenant's return window in days (enforced copy of its returns policy).
+    # None: returns cannot be executed for this tenant (deny by default).
+    return_window_days: int | None = None
 
 
 def _json_default(value: object) -> str:

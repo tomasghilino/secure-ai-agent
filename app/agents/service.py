@@ -37,8 +37,15 @@ from app.core.config import Settings
 from app.database.models import AgentThreadRecord, AuditEventRecord
 from app.database.tenancy import tenant_session
 from app.rag.embeddings import EmbeddingProvider
+from app.security.limits import TokenCounter
 from app.tools.actions import ApprovalDecision
-from app.tools.authorization import APPROVER_ROLES, Principal, Role, approval_denied_reason
+from app.tools.authorization import (
+    APPROVER_ROLES,
+    Principal,
+    Role,
+    approval_denied_reason,
+    parse_role,
+)
 from app.tools.base import ToolContext
 
 ThreadStatus = Literal["running", "awaiting_approval", "completed", "stopped", "failed"]
@@ -76,6 +83,7 @@ class AgentRun:
     pending_action: dict[str, Any] | None
     tool_calls: list[ToolCallTrace] = field(default_factory=list)
     steps: int = 0
+    tokens: int = 0  # model tokens this request consumed (input + output)
 
 
 @dataclass(frozen=True, slots=True)
@@ -241,6 +249,7 @@ class AgentService:
             principal=principal,
             today=self._settings.agent_reference_date or date.today(),
             retrieval_mode=self._settings.rag_retrieval_mode,
+            return_window_days=self._settings.return_window_days.get(principal.tenant_id),
         )
 
     @asynccontextmanager
@@ -289,6 +298,9 @@ class AgentService:
         config = self._config(thread_id)
         # Each step is two graph nodes (agent, tools); leave room for approval.
         config["recursion_limit"] = 4 * self._limits.max_steps + 10
+        # Sees every model call of this run, for the tenant's token budget.
+        tokens = TokenCounter()
+        config["callbacks"] = [tokens]
         try:
             async with self._executor(ctx, thread_id) as executor:
                 deps = AgentDeps(self._model, executor, ctx, self._limits, thread_id)
@@ -314,13 +326,15 @@ class AgentService:
             pending_action=pending,
             tool_calls=tool_trace(messages),
             steps=int(values.get("steps", 0)),
+            tokens=tokens.total,
         )
 
 
 def _role(value: str) -> Role:
-    if value not in ("support_agent", "finance_analyst", "supervisor"):
+    role = parse_role(value)
+    if role is None:
         raise AgentError(f"unknown role {value}")
-    return value  # type: ignore[return-value]
+    return role
 
 
 def _view(thread: AgentThreadRecord, answer: str | None) -> ThreadView:

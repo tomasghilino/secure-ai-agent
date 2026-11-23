@@ -9,7 +9,14 @@ from fastapi import APIRouter, Depends, Request
 from langchain_core.language_models import BaseChatModel
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.api.dependencies import EmbeddingsDep, SessionDep, SettingsDep, TenantDep
+from app.api.dependencies import (
+    EmbeddingsDep,
+    SessionDep,
+    SettingsDep,
+    TenantDep,
+    UsageLimitsDep,
+    WithinTokenBudget,
+)
 from app.api.search import FiltersModel
 from app.rag.answer import Reason, Status, answer_question
 
@@ -49,7 +56,7 @@ class AskResponse(BaseModel):
     usage: dict[str, Any] | None
 
 
-@router.post("/ask")
+@router.post("/ask", dependencies=[WithinTokenBudget])
 async def ask(
     body: AskRequest,
     tenant_id: TenantDep,
@@ -57,6 +64,7 @@ async def ask(
     session: SessionDep,
     embeddings: EmbeddingsDep,
     chat_model: ChatModelDep,
+    limits: UsageLimitsDep,
 ) -> AskResponse:
     answer = await answer_question(
         session,
@@ -69,6 +77,9 @@ async def ask(
         top_k=settings.rag_top_k,
         max_context_tokens=settings.rag_max_context_tokens,
     )
+    if answer.usage:
+        tokens = answer.usage.get("input_tokens", 0) + answer.usage.get("output_tokens", 0)
+        await limits.charge_tokens(tenant_id, int(tokens))
     return AskResponse(
         status=answer.status,
         answer=answer.text,

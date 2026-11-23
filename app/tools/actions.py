@@ -9,6 +9,11 @@ Flow (AWS Agentic Scope 2, "prescribed agency"):
 2. The graph pauses (LangGraph ``interrupt``) until a supervisor decides.
 3. ``decide`` re-checks who is approving, re-reads the order (it may have changed while
    waiting) and only then inserts the RMA. One RMA per order: approving twice is harmless.
+
+The eligibility rules that can be decided from data are enforced in code at both steps
+(``_eligible_order``): delivered, inside the tenant's return window, no build-to-order or
+final-sale lines, no existing RMA. The red-team suite showed why: a hijacked model plus
+an approver who does not read would otherwise create an RMA for a non-returnable pump.
 """
 
 from __future__ import annotations
@@ -68,11 +73,32 @@ class ApprovalDecision(BaseModel):
 
 
 async def _eligible_order(
-    session: AsyncSession, tenant_id: str, order_number: str
-) -> tuple[OrderRecord, Any]:
+    session: AsyncSession, ctx: ToolContext, order_number: str
+) -> tuple[OrderRecord, dict[str, Any]]:
+    """The order and its facts, if a return is allowed by rules decidable from data."""
+    tenant_id = ctx.principal.tenant_id
     order, customer = await load_order(session, tenant_id, order_number)
     if order.status != "delivered":
         raise ToolError(f"order {order_number} is {order.status}: only delivered orders return")
+    facts = await describe_order(session, order, customer, ctx.today)
+    blocked = [
+        line["sku"]
+        for line in facts["lines"]
+        if line["final_sale"] or not line["product_returnable"]
+    ]
+    if blocked:
+        raise ToolError(
+            f"order {order_number} has lines that are not returnable "
+            f"(build-to-order or final sale): {', '.join(blocked)}"
+        )
+    if ctx.return_window_days is None:
+        raise ToolError("no return window is configured for this tenant")
+    days = facts["days_since_delivery"]
+    if days is None or days > ctx.return_window_days:
+        raise ToolError(
+            f"order {order_number} was delivered {days} days ago: outside the "
+            f"{ctx.return_window_days}-day return window"
+        )
     existing = await session.scalar(
         select(ReturnAuthorizationRecord.rma_number).where(
             ReturnAuthorizationRecord.tenant_id == tenant_id,
@@ -81,7 +107,7 @@ async def _eligible_order(
     )
     if existing:
         raise ToolError(f"order {order_number} already has return authorization {existing}")
-    return order, customer
+    return order, facts
 
 
 async def propose(
@@ -99,10 +125,7 @@ async def propose(
                 tenant_session(ctx.sessions, principal.tenant_id) as session,
                 session.begin(),
             ):
-                order, customer = await _eligible_order(
-                    session, principal.tenant_id, args.order_number
-                )
-                facts = await describe_order(session, order, customer, ctx.today)
+                _, facts = await _eligible_order(session, ctx, args.order_number)
         except ValidationError as exc:
             outcome = {"status": "error", "error": f"invalid arguments: {exc.error_count()} errors"}
         except ToolError as exc:
@@ -178,7 +201,7 @@ async def decide(
             tenant_session(ctx.sessions, ctx.principal.tenant_id) as session,
             session.begin(),
         ):
-            order, _ = await _eligible_order(session, ctx.principal.tenant_id, args.order_number)
+            order, _ = await _eligible_order(session, ctx, args.order_number)
             rma_number = f"RMA-{args.order_number}"
             session.add(
                 ReturnAuthorizationRecord(

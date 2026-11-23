@@ -10,12 +10,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.dependencies import get_embeddings, get_session
 from app.main import create_app
 from app.rag.embeddings import FakeEmbeddings
+from app.security.limits import Unlimited
 from tests.integration.conftest import RETURNS_EMEA, RETURNS_V3_0
 
 pytestmark = pytest.mark.integration
 
 QUESTION = {"query": "When must a return request be submitted?"}
-AMER = {"X-Tenant-ID": "nsi-amer"}
+
+
+def caller(tenant: str) -> dict[str, str]:
+    return {"X-Tenant-ID": tenant, "X-User-ID": "agent-1", "X-User-Role": "support_agent"}
+
+
+AMER = caller("nsi-amer")
 
 
 @pytest.fixture
@@ -27,6 +34,7 @@ async def client(
     # the test database session and the fake embeddings are injected instead.
     app.dependency_overrides[get_session] = lambda: session_with_returns_policies
     app.dependency_overrides[get_embeddings] = lambda: FakeEmbeddings()
+    app.state.usage_limits = Unlimited()
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
@@ -51,7 +59,7 @@ async def test_the_caller_only_sees_the_active_version_of_its_tenant(
     client: httpx.AsyncClient, tenant_id: str, expected: tuple[str, str]
 ) -> None:
     response = await client.post(
-        "/v1/search", json={**QUESTION, "limit": 20}, headers={"X-Tenant-ID": tenant_id}
+        "/v1/search", json={**QUESTION, "limit": 20}, headers=caller(tenant_id)
     )
 
     results = response.json()["results"]
@@ -86,6 +94,6 @@ async def test_invalid_requests_are_rejected(
 
 
 async def test_a_malformed_tenant_header_is_rejected(client: httpx.AsyncClient) -> None:
-    response = await client.post("/v1/search", json=QUESTION, headers={"X-Tenant-ID": "NSI AMER"})
+    response = await client.post("/v1/search", json=QUESTION, headers=caller("NSI AMER"))
 
     assert response.status_code == 422

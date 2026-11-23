@@ -1,0 +1,53 @@
+# Builds, scans and pushes the runtime and ops images to the staging registry. Manual, and
+# bound to the protected "staging" environment: the AWS role trusts only this repository's
+# jobs in that environment (OIDC), so there are no AWS access keys anywhere.
+name: Publish images
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-images
+  cancel-in-progress: false
+
+env:
+  TRIVY_IMAGE: ghcr.io/aquasecurity/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+
+jobs:
+  publish:
+    name: Build, scan and push
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write # the OIDC token exchanged for short-lived AWS credentials
+    env:
+      REPOSITORY: ${{ vars.ECR_REPOSITORY_URL }}
+      TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Build
+        run: |
+          docker build --target runtime -t "$REPOSITORY:$TAG" .
+          docker build --target ops -t "$REPOSITORY:ops-$TAG" .
+      - name: Fixable HIGH and CRITICAL vulnerabilities (Trivy)
+        run: >-
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY_IMAGE"
+          image --quiet --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1
+          "$REPOSITORY:$TAG"
+      - name: Push
+        run: |
+          aws ecr get-login-password | docker login --username AWS --password-stdin "${REPOSITORY%%/*}"
+          docker push "$REPOSITORY:$TAG"
+          docker push "$REPOSITORY:ops-$TAG"
+          echo "Pushed $TAG: set image_tag = \"$TAG\" in terraform.tfvars and apply." >> "$GITHUB_STEP_SUMMARY"

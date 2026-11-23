@@ -14,10 +14,11 @@ from app.api.dependencies import get_embeddings, get_session
 from app.main import create_app
 from app.rag.embeddings import FakeEmbeddings
 from app.rag.llm import FakeGroundedChatModel
+from app.security.limits import Unlimited
 
 pytestmark = pytest.mark.integration
 
-AMER = {"X-Tenant-ID": "nsi-amer"}
+AMER = {"X-Tenant-ID": "nsi-amer", "X-User-ID": "agent-1", "X-User-Role": "support_agent"}
 QUESTION = {"question": "When must a return request be submitted?"}
 
 ClientFactory = Callable[[BaseChatModel], httpx.AsyncClient]
@@ -34,6 +35,7 @@ async def client_with(
         app.dependency_overrides[get_session] = lambda: session_with_returns_policies
         app.dependency_overrides[get_embeddings] = lambda: FakeEmbeddings()
         app.dependency_overrides[get_chat_model] = lambda: chat_model
+        app.state.usage_limits = Unlimited()
         client = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test")
         clients.append(client)
         return client

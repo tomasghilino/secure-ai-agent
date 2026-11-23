@@ -28,6 +28,7 @@ from typing import Any, ClassVar
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     Computed,
     DateTime,
@@ -423,3 +424,19 @@ class ReturnAuthorizationRecord(Base):
     approved_by: Mapped[str]
     thread_id: Mapped[uuid.UUID | None]
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class UsageCounterRecord(Base):
+    """Fixed-window counters for rate limits and token budgets (ADR-0009).
+
+    ``counter`` names what is counted: ``requests:<user>`` per minute, ``tokens`` per UTC
+    day. Incremented with one atomic upsert, so every API replica shares the same limits
+    without another service (no Redis). Old windows are only history and can be pruned.
+    """
+
+    __tablename__ = "usage_counters"
+
+    tenant_id: Mapped[str] = mapped_column(primary_key=True)
+    counter: Mapped[str] = mapped_column(primary_key=True)
+    window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    value: Mapped[int] = mapped_column(BigInteger)

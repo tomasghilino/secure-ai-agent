@@ -17,6 +17,8 @@ build/
 !.env.example
 *.pem
 *.key
+# Local development token issuer (`make token`)
+.auth/
 
 # --- Local data (regenerated deterministically) ---
 data/storage/*
@@ -44,3 +46,6 @@ Thumbs.db
 
 # --- Claude Code local settings ---
 .claude/settings.local.json
+
+# Terraform build artifacts (Lambda packages)
+infra/terraform/.build/

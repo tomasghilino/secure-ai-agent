@@ -11,7 +11,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.agents.service import AgentError, AgentRun, AgentService, ThreadView
-from app.api.dependencies import PrincipalDep, SettingsDep
+from app.api.dependencies import PrincipalDep, SettingsDep, UsageLimitsDep, WithinTokenBudget
+from app.security.limits import UsageLimits
+from app.tools.authorization import Principal
 
 router = APIRouter(prefix="/v1", tags=["agent"])
 
@@ -31,6 +33,14 @@ async def _call[T](operation: Awaitable[T]) -> T:
         return await operation
     except AgentError as exc:
         raise HTTPException(exc.status_code, str(exc)) from exc
+
+
+async def _run(
+    operation: Awaitable[AgentRun], principal: Principal, limits: UsageLimits
+) -> RunResponse:
+    run = await _call(operation)
+    await limits.charge_tokens(principal.tenant_id, run.tokens)
+    return RunResponse.of(run)
 
 
 class MessageRequest(BaseModel):
@@ -61,6 +71,7 @@ class RunResponse(BaseModel):
     )
     tool_calls: list[ToolCallModel]
     steps: int
+    tokens: int = Field(description="Model tokens this request consumed (input + output)")
 
     @classmethod
     def of(cls, run: AgentRun) -> RunResponse:
@@ -71,6 +82,7 @@ class RunResponse(BaseModel):
             pending_action=run.pending_action,
             tool_calls=[ToolCallModel(**vars_of(c)) for c in run.tool_calls],
             steps=run.steps,
+            tokens=run.tokens,
         )
 
 
@@ -108,29 +120,38 @@ def vars_of(obj: Any) -> dict[str, Any]:
     return {name: getattr(obj, name) for name in obj.__slots__}
 
 
-@router.post("/agent/threads")
+@router.post("/agent/threads", dependencies=[WithinTokenBudget])
 async def start_thread(
-    body: MessageRequest, principal: PrincipalDep, agent: AgentServiceDep
+    body: MessageRequest, principal: PrincipalDep, agent: AgentServiceDep, limits: UsageLimitsDep
 ) -> RunResponse:
     """Start a conversation with the operations agent."""
-    return RunResponse.of(await _call(agent.start(principal, body.message)))
+    return await _run(agent.start(principal, body.message), principal, limits)
 
 
-@router.post("/agent/threads/{thread_id}/messages")
+@router.post("/agent/threads/{thread_id}/messages", dependencies=[WithinTokenBudget])
 async def send_message(
-    thread_id: uuid.UUID, body: MessageRequest, principal: PrincipalDep, agent: AgentServiceDep
+    thread_id: uuid.UUID,
+    body: MessageRequest,
+    principal: PrincipalDep,
+    agent: AgentServiceDep,
+    limits: UsageLimitsDep,
 ) -> RunResponse:
     """Continue a conversation (its owner only)."""
-    return RunResponse.of(await _call(agent.send(principal, thread_id, body.message)))
+    return await _run(agent.send(principal, thread_id, body.message), principal, limits)
 
 
-@router.post("/agent/threads/{thread_id}/decision")
+@router.post("/agent/threads/{thread_id}/decision", dependencies=[WithinTokenBudget])
 async def decide(
-    thread_id: uuid.UUID, body: DecisionRequest, principal: PrincipalDep, agent: AgentServiceDep
+    thread_id: uuid.UUID,
+    body: DecisionRequest,
+    principal: PrincipalDep,
+    agent: AgentServiceDep,
+    limits: UsageLimitsDep,
 ) -> RunResponse:
     """Approve or reject the pending action (supervisors, never the requester)."""
     run = agent.decide(principal, thread_id, approved=body.approve, comment=body.comment)
-    return RunResponse.of(await _call(run))
+    # The resumed run calls the model again: charged to the tenant like any other.
+    return await _run(run, principal, limits)
 
 
 @router.get("/agent/threads/{thread_id}")

@@ -3,11 +3,17 @@
 # Windows (cmd.exe). Run `make help` to list targets.
 
 .DEFAULT_GOAL := help
-.PHONY: help setup data dev up down migrate migration seed ingest worker search ask agent approve mcp eval-retrieval eval-answers llm-up llm-pull test test-integration test-llm lint format typecheck check
+.PHONY: help setup data dev up down migrate migration seed ingest worker search ask agent approve mcp token eval-retrieval eval-answers eval-security llm-up llm-pull test test-integration test-llm lint format typecheck check image scan tf-check staging-plan staging-images
 
 OLLAMA_CHAT_MODEL ?= qwen3:8b
 OLLAMA_EMBEDDING_MODEL ?= qwen3-embedding:0.6b
-# Development identity for `make agent` / `make mcp` (to be replaced by JWT authentication).
+# Git Bash would rewrite container paths such as /repo into Windows paths.
+export MSYS_NO_PATHCONV := 1
+# Security scanners, pinned by digest (same images as CI).
+GITLEAKS_IMAGE := ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+TRIVY_IMAGE := ghcr.io/aquasecurity/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+IMAGE ?= secure-ai-agent:local
+# Development identity for `make agent`, `make mcp` and `make token`.
 tenant ?= nsi-amer
 role ?= support_agent
 user ?= agent-1
@@ -61,11 +67,17 @@ approve: ## Decide a pending agent action as supervisor sup-1: make approve t=<t
 mcp: ## Run the read-only MCP server on stdio: make mcp [tenant=... role=...] (for MCP clients)
 	uv run python -m app.mcp_server --tenant $(tenant) --role $(role) --user $(user)
 
+token: ## Mint a local JWT for the API (AUTH_MODE=jwt): make token [role=supervisor user=sup-1]
+	uv run python -m scripts.dev_token --tenant $(tenant) --role $(role) --user $(user)
+
 eval-retrieval: ## Retrieval metrics (dense vs keyword vs hybrid) on data/evaluation; free
 	uv run python -m scripts.evaluate_retrieval
 
 eval-answers: ## Answer checks (citations, refusals) on data/evaluation with the chat model
 	uv run python -m scripts.evaluate_answers
+
+eval-security: ## AI red-team suite against the agent (injection, cross-tenant, tool abuse...)
+	uv run python -m scripts.evaluate_security
 
 llm-up: ## Start local Ollama on the NVIDIA GPU (compose profile `llm`)
 	docker compose --profile llm up -d --wait ollama
@@ -95,3 +107,38 @@ typecheck: ## Static type checking (mypy --strict)
 	uv run mypy
 
 check: lint typecheck test ## Everything CI runs locally
+
+image: ## Build the hardened production image (Dockerfile target `runtime`)
+	docker build --target runtime -t $(IMAGE) .
+
+scan: image ## Security scans as in CI: secrets in history, dependency CVEs, misconfigurations, image CVEs
+	docker run --rm -v "$(CURDIR):/repo" $(GITLEAKS_IMAGE) git /repo --redact --no-banner
+	uv export --frozen --no-dev --no-emit-project --quiet --output-file reports/requirements.txt
+	uvx pip-audit@2.10.1 --requirement reports/requirements.txt --require-hashes --disable-pip --strict
+	docker run --rm -v "$(CURDIR):/src:ro" -v trivy-cache:/root/.cache/ $(TRIVY_IMAGE) fs --quiet --scanners misconfig,secret --severity HIGH,CRITICAL --exit-code 1 --skip-dirs /src/.venv --skip-dirs /src/.auth --skip-dirs /src/notes --skip-dirs /src/reports --skip-dirs /src/infra/terraform/.terraform /src
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v trivy-cache:/root/.cache/ $(TRIVY_IMAGE) image --quiet --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 $(IMAGE)
+
+# --- AWS staging (Terraform). Plans and applies need an AWS login; see docs/operations/staging.md
+TF := terraform -chdir=infra/terraform
+# Evaluated only by the targets that use them.
+STAGING_REPOSITORY = $(shell $(TF) output -raw ecr_repository_url)
+STAGING_TAG = $(shell git rev-parse --short=12 HEAD)
+# Pushes run in a Linux Docker CLI container: the Windows credential store rejects ECR's
+# long login token, and the token then lives only inside the throwaway container.
+DOCKER_CLI_IMAGE := docker:28.5.1-cli@sha256:9190b0613792e658a7783cf14b2d5ace5941bb68ede7276922ea36ee457d76ad
+
+tf-check: ## Terraform format and validation (no AWS access needed)
+	$(TF) fmt -check -recursive
+	$(TF) init -backend=false -input=false
+	$(TF) validate
+
+staging-plan: ## Show what applying would change in AWS staging (needs an AWS login; changes nothing)
+	$(TF) init -input=false
+	$(TF) plan -out=staging.tfplan
+
+staging-images: ## Build, scan and push the runtime and ops images (tag = current commit)
+	docker build --target runtime -t $(STAGING_REPOSITORY):$(STAGING_TAG) .
+	docker build --target ops -t $(STAGING_REPOSITORY):ops-$(STAGING_TAG) .
+	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v trivy-cache:/root/.cache/ $(TRIVY_IMAGE) image --quiet --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 $(STAGING_REPOSITORY):$(STAGING_TAG)
+	aws ecr get-login-password | docker run -i --rm -v /var/run/docker.sock:/var/run/docker.sock $(DOCKER_CLI_IMAGE) sh -c "docker login --username AWS --password-stdin $(firstword $(subst /, ,$(STAGING_REPOSITORY))) && docker push -q $(STAGING_REPOSITORY):$(STAGING_TAG) && docker push -q $(STAGING_REPOSITORY):ops-$(STAGING_TAG)"
+	@echo Pushed $(STAGING_TAG): set image_tag = "$(STAGING_TAG)" in infra/terraform/terraform.tfvars

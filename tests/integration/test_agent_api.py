@@ -1,10 +1,13 @@
 """Agent endpoints over HTTP with the offline rule-based model (LLM_PROVIDER=fake)."""
 
+import json
 from collections.abc import AsyncIterator
 from datetime import date
+from pathlib import Path
 
 import httpx
 import pytest
+from fastapi import FastAPI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -14,6 +17,9 @@ from app.agents.service import AgentService
 from app.core.config import Settings
 from app.main import create_app
 from app.rag.embeddings import FakeEmbeddings
+from app.security.limits import Unlimited
+from app.security.tokens import TokenVerifier
+from scripts.dev_token import DEV_AUDIENCE, DEV_ISSUER, generate_signing_key, mint, public_jwks
 from scripts.seed_business_data import load_sources, seed
 
 pytestmark = pytest.mark.integration
@@ -37,13 +43,14 @@ async def checkpointer(database_url: str) -> AsyncIterator[AsyncPostgresSaver]:
 
 
 @pytest.fixture
-async def client(
+async def app(
     sessions: async_sessionmaker[AsyncSession],
     session_with_returns_policies: AsyncSession,
     checkpointer: AsyncPostgresSaver,
-) -> AsyncIterator[httpx.AsyncClient]:
+) -> FastAPI:
     await seed(session_with_returns_policies, load_sources())
     app = create_app()
+    app.state.usage_limits = Unlimited()
     app.state.agent_service = AgentService(
         sessions=sessions,
         embeddings=FakeEmbeddings(),
@@ -51,6 +58,11 @@ async def client(
         checkpointer=checkpointer,
         settings=Settings(_env_file=None, agent_reference_date=date(2026, 11, 15)),  # type: ignore[call-arg]
     )
+    return app
+
+
+@pytest.fixture
+async def client(app: FastAPI) -> AsyncIterator[httpx.AsyncClient]:
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="http://test"
     ) as http:
@@ -141,3 +153,36 @@ async def test_the_kill_switch_disables_the_agent(
     response = await client.post("/v1/agent/threads", json={"message": "hi"}, headers=SUPPORT)
 
     assert response.status_code == 503
+
+
+async def test_in_jwt_mode_the_identity_comes_only_from_the_token(
+    app: FastAPI, client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from app.core.config import get_settings
+
+    key = generate_signing_key()
+    jwks = tmp_path / "jwks.json"
+    jwks.write_text(json.dumps(public_jwks(key)), encoding="utf-8")
+    for name, value in {
+        "AUTH_MODE": "jwt",
+        "AUTH_JWT_ISSUER": DEV_ISSUER,
+        "AUTH_JWT_AUDIENCE": DEV_AUDIENCE,
+        "AUTH_JWKS_PATH": str(jwks),
+    }.items():
+        monkeypatch.setenv(name, value)
+    get_settings.cache_clear()
+    app.state.token_verifier = TokenVerifier.from_settings(get_settings())
+    support = mint(key, subject="agent-7", tenant="nsi-amer", roles=["support_agent"])
+
+    spoofed = await client.post("/v1/agent/threads", json=RETURN_REQUEST, headers=SUPERVISOR)
+    started = await client.post(
+        "/v1/agent/threads", json=RETURN_REQUEST, headers={"Authorization": f"Bearer {support}"}
+    )
+    thread = started.json()["thread_id"]
+    as_owner = await client.get(
+        f"/v1/agent/threads/{thread}", headers={"Authorization": f"Bearer {support}"}
+    )
+
+    assert spoofed.status_code == 401  # identity headers mean nothing with JWT on
+    assert started.json()["status"] == "awaiting_approval"
+    assert as_owner.json()["created_by"] == "agent-7"  # the token's subject

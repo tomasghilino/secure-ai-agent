@@ -13,8 +13,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import make_url
 
 Environment = Literal["local", "test", "staging"]
 # fake    -> deterministic, offline, free (unit tests, CI)
@@ -24,6 +25,15 @@ Provider = Literal["fake", "ollama", "bedrock"]
 
 # ElasticMQ from docker compose, as seen from the host (containers override it).
 LOCAL_SQS_ENDPOINT = "http://localhost:9324"
+
+# dev_headers -> identity from X-Tenant-ID / X-User-ID / X-User-Role (local and test only)
+# jwt         -> a signed bearer token from an OpenID Connect provider (required in staging)
+AuthMode = Literal["dev_headers", "jwt"]
+# Asymmetric signatures only. "none" and HMAC (HS256...) are never accepted, so a public
+# key can never be replayed as an HMAC secret (algorithm confusion).
+ASYMMETRIC_JWT_ALGORITHMS = frozenset(
+    {"RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA"}
+)
 
 
 class Settings(BaseSettings):
@@ -39,8 +49,36 @@ class Settings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_format: Literal["console", "json"] = "console"
 
+    # --- Authentication (ADR-0009) ---
+    auth_mode: AuthMode = "dev_headers"
+    auth_jwt_issuer: str | None = None  # exact `iss` expected
+    auth_jwt_audience: str | None = None  # exact audience expected (this API's client)
+    # Claim that carries the audience. "aud" is the standard; Cognito access tokens carry
+    # the app client in "client_id" instead (and token_use=access), so they use that.
+    auth_audience_claim: Literal["aud", "client_id"] = "aud"
+    # Where the provider's public keys come from (exactly one): its JWKS endpoint in
+    # deployed environments, a local file in development (`make token` creates one), or
+    # the JWKS document itself, for a network that cannot reach the provider.
+    auth_jwks_url: str | None = None
+    auth_jwks_path: Path | None = None
+    auth_jwks_json: str | None = None
+    auth_jwt_algorithms: list[str] = Field(default_factory=lambda: ["RS256"])
+    # Claim names differ per provider (Cognito: "custom:tenant_id", "cognito:groups").
+    auth_tenant_claim: str = "tenant_id"
+    auth_roles_claim: str = "roles"
+    auth_clock_skew_seconds: int = Field(default=30, ge=0, le=300)
+
+    # --- Abuse and cost limits (ADR-0009) ---
+    # Requests per user per minute on every /v1 endpoint.
+    rate_limit_per_minute: int = Field(default=60, ge=1, le=10_000)
+    # Model tokens (input + output) a tenant may spend per UTC day: "denial of wallet".
+    tenant_daily_token_budget: int = Field(default=500_000, ge=1_000)
+
     # --- Database ---
     database_url: str = "postgresql+psycopg://northstar:northstar@localhost:5432/northstar"
+    # Set separately in deployed environments (injected from a secrets store), so the
+    # URL itself holds no secret; it replaces any password in DATABASE_URL.
+    database_password: SecretStr | None = None
 
     # --- Model providers ---
     llm_provider: Provider = "fake"
@@ -61,8 +99,10 @@ class Settings(BaseSettings):
     bedrock_embedding_model_id: str = "amazon.titan-embed-text-v2:0"
 
     # --- Uploads, object storage and queue (ADR-0003) ---
-    # Uploaded PDFs: a local directory in development, S3 in staging (planned).
+    # Uploaded PDFs: a local directory in development and tests, S3 in staging.
+    storage_backend: Literal["local", "s3"] = "local"
     storage_root: Path = Path("data/storage")
+    storage_bucket: str | None = None
     # Unset = real SQS. Only staging may use it: local and test always talk to ElasticMQ,
     # so a development machine never sends messages to AWS by accident.
     sqs_endpoint_url: str | None = None
@@ -103,11 +143,19 @@ class Settings(BaseSettings):
     # Qwen3 8B read "days_since_delivery: 40" as inside a 30-day window; with it, correct.
     agent_reasoning: bool = True
 
+    # Return window per tenant, in days: the enforced copy of each tenant's active
+    # returns policy (NSI-POL-RET-003 v3.0, NSI-EU-POL-RET-001 v1.2); a test checks they
+    # agree. The documents explain the rule, this setting enforces it in code, even if
+    # the model and the approver both miss it. No entry: no returns for that tenant.
+    return_window_days: dict[str, int] = Field(
+        default_factory=lambda: {"nsi-amer": 30, "nsi-emea": 21}
+    )
+
     # --- MCP server (`make mcp`): the one identity every tool call runs as ---
     # Fixed at launch, never taken from the model or the client (no confused deputy).
     mcp_tenant_id: str | None = Field(default=None, pattern=r"^[a-z0-9-]{1,64}$")
     mcp_user_id: str = Field(default="mcp-client", pattern=r"^[A-Za-z0-9._@-]{1,64}$")
-    mcp_role: Literal["support_agent", "finance_analyst", "supervisor"] | None = None
+    mcp_role: Literal["support_agent", "finance_analyst", "supervisor", "editor"] | None = None
 
     @field_validator("embedding_dimensions")
     @classmethod
@@ -127,9 +175,53 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
+    def _authentication(self) -> Settings:
+        # Fail at startup, not on the first request: a deployed API must never trust
+        # identity headers, and a JWT setup without issuer or audience is not a check.
+        if self.auth_mode == "dev_headers":
+            if self.app_env not in ("local", "test"):
+                raise ValueError("AUTH_MODE=dev_headers is only allowed in local and test")
+            return self
+        if not self.auth_jwt_issuer or not self.auth_jwt_audience:
+            raise ValueError("AUTH_MODE=jwt requires AUTH_JWT_ISSUER and AUTH_JWT_AUDIENCE")
+        sources = [self.auth_jwks_url, self.auth_jwks_path, self.auth_jwks_json]
+        if sum(source is not None for source in sources) != 1:
+            raise ValueError(
+                "AUTH_MODE=jwt requires exactly one of AUTH_JWKS_URL, AUTH_JWKS_PATH, "
+                "AUTH_JWKS_JSON"
+            )
+        if self.auth_jwks_url is not None and not self.auth_jwks_url.startswith("https://"):
+            raise ValueError("AUTH_JWKS_URL must use https")
+        algorithms = set(self.auth_jwt_algorithms)
+        if not algorithms or not algorithms <= ASYMMETRIC_JWT_ALGORITHMS:
+            raise ValueError(
+                f"AUTH_JWT_ALGORITHMS must be asymmetric: {sorted(ASYMMETRIC_JWT_ALGORITHMS)}"
+            )
+        return self
+
+    @model_validator(mode="after")
     def _local_queue_endpoint(self) -> Settings:
         if self.app_env != "staging" and self.sqs_endpoint_url is None:
             self.sqs_endpoint_url = LOCAL_SQS_ENDPOINT
+        return self
+
+    @model_validator(mode="after")
+    def _object_storage(self) -> Settings:
+        # Like the queue: a development machine or a test never writes to AWS by accident.
+        if self.storage_backend == "s3":
+            if self.app_env != "staging":
+                raise ValueError("STORAGE_BACKEND=s3 is only allowed in staging")
+            if not self.storage_bucket:
+                raise ValueError("STORAGE_BACKEND=s3 requires STORAGE_BUCKET")
+        return self
+
+    @model_validator(mode="after")
+    def _database_password(self) -> Settings:
+        if self.database_password is not None:
+            url = make_url(self.database_url).set(
+                password=self.database_password.get_secret_value()
+            )
+            self.database_url = url.render_as_string(hide_password=False)
         return self
 
 
