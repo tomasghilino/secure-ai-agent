@@ -123,6 +123,9 @@ TF := terraform -chdir=infra/terraform
 # Evaluated only by the targets that use them.
 STAGING_REPOSITORY = $(shell $(TF) output -raw ecr_repository_url)
 STAGING_TAG = $(shell git rev-parse --short=12 HEAD)
+# Pushes run in a Linux Docker CLI container: the Windows credential store rejects ECR's
+# long login token, and the token then lives only inside the throwaway container.
+DOCKER_CLI_IMAGE := docker:28.5.1-cli@sha256:9190b0613792e658a7783cf14b2d5ace5941bb68ede7276922ea36ee457d76ad
 
 tf-check: ## Terraform format and validation (no AWS access needed)
 	$(TF) fmt -check -recursive
@@ -137,7 +140,5 @@ staging-images: ## Build, scan and push the runtime and ops images (tag = curren
 	docker build --target runtime -t $(STAGING_REPOSITORY):$(STAGING_TAG) .
 	docker build --target ops -t $(STAGING_REPOSITORY):ops-$(STAGING_TAG) .
 	docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v trivy-cache:/root/.cache/ $(TRIVY_IMAGE) image --quiet --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 $(STAGING_REPOSITORY):$(STAGING_TAG)
-	aws ecr get-login-password | docker login --username AWS --password-stdin $(firstword $(subst /, ,$(STAGING_REPOSITORY)))
-	docker push $(STAGING_REPOSITORY):$(STAGING_TAG)
-	docker push $(STAGING_REPOSITORY):ops-$(STAGING_TAG)
+	aws ecr get-login-password | docker run -i --rm -v /var/run/docker.sock:/var/run/docker.sock $(DOCKER_CLI_IMAGE) sh -c "docker login --username AWS --password-stdin $(firstword $(subst /, ,$(STAGING_REPOSITORY))) && docker push -q $(STAGING_REPOSITORY):$(STAGING_TAG) && docker push -q $(STAGING_REPOSITORY):ops-$(STAGING_TAG)"
 	@echo Pushed $(STAGING_TAG): set image_tag = "$(STAGING_TAG)" in infra/terraform/terraform.tfvars
