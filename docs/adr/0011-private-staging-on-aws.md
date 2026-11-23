@@ -1,6 +1,6 @@
 # ADR-0011: A private, disposable staging environment on AWS
 
-- Status: Accepted (not yet applied)
+- Status: Accepted (applied, verified and destroyed on 2026-11-22)
 - Date: 2026-11-22
 
 ## Context
@@ -80,6 +80,9 @@ Knowledge Bases, no provisioned throughput (ADR-0003, ADR-0004).
   protection, Performance Insights, Container Insights, bucket access logs).
 - Residual risks: the API connects as the RDS master user (Row-Level Security still
   applies through `SET LOCAL ROLE`); TLS to RDS is `sslmode=require`, not `verify-full`;
-  interface endpoints sit in one AZ; the HTTP API caps requests at 30 seconds and 10 MB;
-  whether the Cognito endpoint serves the JWKS path privately is not documented by AWS
-  and is the first deployment check (fallback: `auth_jwks_json`).
+  interface endpoints sit in one AZ; the HTTP API caps requests at 30 seconds and 10 MB.
+- Verified on a real deployment (fake model providers, since the Bedrock quotas are 0):
+  16 functional and security checks, the network perimeter probed from inside a task,
+  and IAM Access Analyzer with no findings. AWS does not document whether the Cognito
+  endpoint serves the JWKS path; it does. Results:
+  [staging verification](../benchmarks/2026-11-22-staging.md).

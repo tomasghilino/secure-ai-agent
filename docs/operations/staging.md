@@ -73,6 +73,8 @@ make data                              # the sample PDFs, if not generated yet
 uv run python -m scripts.staging upload
 ```
 
+Results of the first deployment: [staging verification](../benchmarks/2026-11-22-staging.md).
+
 Images can also be pushed by the **Publish images** workflow (OIDC): set
 `github_repository` in `terraform.tfvars`, create a protected `staging` environment in
 the repository, and set the repository variables `AWS_ROLE_ARN`
@@ -96,9 +98,9 @@ curl -s -X POST "$API/v1/agent/threads" -H "Authorization: Bearer $TOKEN" \
 Then approve the pending return as `sup-1` (`POST /v1/agent/threads/<id>/decision` with
 `{"approve": true}`), and check that `sup-9` (other tenant) cannot see the thread.
 
-**First check: signing keys through the VPC endpoint.** If valid tokens get 401 from the
-API (not the gateway) and the API logs show a JWKS error, the Cognito endpoint does not
-serve the keys privately. Fetch them and pass them inline:
+Signing keys come through the `cognito-idp` VPC endpoint (verified on 2026-11-22). If
+valid tokens ever get 401 from the API (not the gateway) and its logs show a JWKS error,
+pass the keys inline instead:
 
 ```bash
 curl -s "$(terraform -chdir=infra/terraform output -raw cognito_jwks_url)" > jwks.json

@@ -25,9 +25,12 @@
   authorizer, ECS Fargate without an internet route, VPC endpoints with data-perimeter
   policies, a customer-managed KMS key, least-privilege IAM, image pushes through OIDC
 
+- Staging applied, verified (16 checks, perimeter probes, IAM Access Analyzer) and
+  destroyed
+
 ## Next
 
-- Apply the staging environment, run the verification checks, destroy it
+- Bedrock models on staging, once the account's quotas are restored
 - Red-team and faithfulness results with real models (Qwen3 locally, Claude on Bedrock)
 - A database login role with IAM authentication instead of the RDS master user
 - Tracing (OpenTelemetry or Langfuse) correlated with the request ID

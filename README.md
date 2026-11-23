@@ -28,7 +28,8 @@ through read-only tools, and never changes anything without a human approval.
 - **AWS staging in Terraform**: API Gateway with a Cognito JWT authorizer in front of ECS
   Fargate tasks that have no route to the internet; VPC endpoints with data-perimeter
   policies, one customer-managed KMS key, least-privilege IAM and image pushes through OIDC
-  ([decision](docs/adr/0011-private-staging-on-aws.md), [runbook and cost](docs/operations/staging.md)).
+  Deployed, verified and destroyed ([decision](docs/adr/0011-private-staging-on-aws.md),
+  [verification](docs/benchmarks/2026-11-22-staging.md), [runbook and cost](docs/operations/staging.md)).
 - **MCP server** (read-only, stdio) usable from any MCP client; the agent's MCP client
   pins tool definitions by hash.
 - **Async ingestion**: PDF upload → queue → idempotent worker (extraction, chunking,
@@ -77,5 +78,5 @@ command.
 - [Architecture decision records](docs/adr)
 - [RAG evaluation results](docs/benchmarks/2026-11-19-rag-local.md)
 - [Red-team and supply-chain results](docs/benchmarks/2026-11-22-red-team.md)
-- [AWS staging runbook](docs/operations/staging.md)
+- [AWS staging runbook](docs/operations/staging.md) and [verification](docs/benchmarks/2026-11-22-staging.md)
 - [Roadmap](docs/ROADMAP.md)
