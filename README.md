@@ -2,81 +2,113 @@
 
 [![CI](https://github.com/tomasghilino/secure-ai-agent/actions/workflows/ci.yml/badge.svg)](https://github.com/tomasghilino/secure-ai-agent/actions/workflows/ci.yml)
 
-An AI operations agent for a fictional industrial distributor, built security-first. It
-answers questions from company documents with verified citations, looks up business data
-through read-only tools, and never changes anything without a human approval.
+An AI assistant for a company's operations team. It answers questions from internal
+documents and looks up orders, invoices and tickets. It can also request one real action
+(a product return), but a supervisor has to approve it first.
 
-## Highlights
+The point of the project is to show how to make an LLM agent safe to put in front of
+real data. Every control is enforced in code and proven by tests, by an attack suite and
+by a real AWS deployment. The company and its data are synthetic.
 
-- **Hybrid RAG**: pgvector + PostgreSQL full-text search fused with Reciprocal Rank Fusion;
-  answers cite document, version and page, and refuse when the evidence is missing.
-  Measured on a labelled set of 47 questions ([results](docs/benchmarks/2026-11-19-rag-local.md)).
-- **LangGraph agent** with a bounded loop over 8 read-only tools (orders, tickets,
-  invoices, suppliers, policies).
-- **Human in the loop**: the only write (a return authorization) pauses the run until a
-  supervisor approves it; eligibility rules are enforced in code before and after approval.
-- **Identity and limits**: JWT authentication with roles from claims, per-user rate limits
-  and per-tenant daily token budgets.
-- **Security controls**: tenant isolation with Row-Level Security, role-based tool
-  authorization (deny by default), separation of duties, an append-only audit log and a
-  kill switch. See the [threat model](docs/security/THREAT_MODEL.md), mapped to the OWASP
-  Top 10 for LLM, agentic and MCP applications.
-- **AI red team**: 17 attacks (prompt injection, cross-tenant probing, tool abuse...) run
-  in CI; verdicts come from the database and tool trace ([results](docs/benchmarks/2026-11-22-red-team.md)).
-- **Supply chain**: CI runs gitleaks, pip-audit, Trivy and produces an SBOM; actions are
-  pinned by SHA and images by digest; the production image runs non-root and read-only.
-- **AWS staging in Terraform**: API Gateway with a Cognito JWT authorizer in front of ECS
-  Fargate tasks that have no route to the internet; VPC endpoints with data-perimeter
-  policies, one customer-managed KMS key, least-privilege IAM and image pushes through OIDC
-  Deployed, verified and destroyed ([decision](docs/adr/0011-private-staging-on-aws.md),
-  [verification](docs/benchmarks/2026-11-22-staging.md), [runbook and cost](docs/operations/staging.md)).
-- **MCP server** (read-only, stdio) usable from any MCP client; the agent's MCP client
-  pins tool definitions by hash.
-- **Async ingestion**: PDF upload → queue → idempotent worker (extraction, chunking,
-  embeddings with a cache).
+## What it does
+
+- **Answers from documents (RAG).** *"How many days do I have to return a product?"*:
+  the answer cites the document, version and page. With no evidence, it says so instead
+  of guessing.
+- **Agent with tools.** *"Can customer C-1006 return order SO-2026-0103?"*: it looks up
+  the order, checks the policy and answers. If it is asked to create the return, it pauses
+  until a supervisor approves.
+- **Multi-tenant.** Two business units share the system, and neither can see the other's
+  data.
+
+## How it works
+
+```mermaid
+flowchart LR
+    user([Employee]) -->|signed token| api[FastAPI<br/>auth, rate limits, token budget]
+    api --> rag[RAG<br/>hybrid search + cited answer]
+    api --> agent[LangGraph agent<br/>8 read-only tools + 1 action]
+    agent -->|return request| approval{{Supervisor approval}}
+    rag --> db[(PostgreSQL + pgvector<br/>Row-Level Security)]
+    agent --> db
+    upload[PDF upload] --> queue[[Queue]] --> worker[Ingestion worker] --> db
+```
+
+- **Retrieval**: vector search plus keyword search, merged with Reciprocal Rank Fusion.
+  Tenant, version and access filters are part of the SQL query.
+- **Agent**: an explicit LangGraph state machine with a step limit. The action pauses the
+  run (interrupt/resume) and the state is kept in PostgreSQL.
+- **Models**: Ollama (Qwen3) locally and Amazon Bedrock in AWS, behind one interface.
+  Tests use deterministic fake models, so CI is free and offline.
+- **MCP server**: the same read-only tools, usable from any MCP client.
+
+## Security, and how it is proven
+
+| Risk | Control | Proof |
+| --- | --- | --- |
+| Prompt injection makes the agent act | Read-only tools; the only write needs a supervisor; eligibility rules in code | Red team: 17 attacks, none succeeded |
+| One tenant sees another's data | Tenant taken only from the verified token; PostgreSQL Row-Level Security | Integration tests, AWS checks |
+| A user goes beyond their role | Role-by-tool permissions, deny by default; the requester can never approve (also a DB constraint) | Tests |
+| Forged identity | Signed JWTs (asymmetric keys, issuer, audience, expiry); Amazon Cognito in AWS | Forged-token tests |
+| Runaway cost | Step, tool and token limits; requests per user; tokens per tenant per day | Tests |
+| Vulnerable dependencies, leaked secrets | gitleaks, pip-audit, Trivy and an SBOM in CI; pinned actions and images | Every pull request |
+| Data leaving the cloud | No internet route; AWS access only through VPC endpoints limited to this account | Probed from inside a container in AWS |
+
+Full threat model, mapped to the OWASP Top 10 for LLM, agentic and MCP applications:
+[docs/security/THREAT_MODEL.md](docs/security/THREAT_MODEL.md).
+
+## Results
+
+- **Retrieval**: the right section is in the top 5 for 95% of 42 labelled questions, and
+  an outdated version or another tenant's document never comes back.
+- **Answers** (Qwen3 8B, local): 41 of 42 answered, 40 of them citing the right section;
+  all 5 unanswerable questions refused.
+- **Red team**: it found a real gap, where a manipulated agent plus a supervisor who
+  approves without reading could return a non-returnable product. Rules in code closed it.
+- **AWS**: deployed with Terraform, passed 16 of 16 functional and security checks, IAM
+  Access Analyzer reported 0 findings, then destroyed. Total cost about USD 0.15.
+- **Tests**: 161 unit and 106 integration tests, all running in CI.
 
 ## Tech stack
 
 | Area | Tools |
 | --- | --- |
-| API | Python 3.12, FastAPI, Pydantic, PyJWT |
-| Data | PostgreSQL 17, pgvector (HNSW), full-text search, SQLAlchemy 2 (async), Alembic |
-| AI | LangChain, LangGraph, MCP Python SDK |
-| Models | Ollama locally (Qwen3 8B, Qwen3-Embedding); Amazon Bedrock for staging (Claude Haiku, Titan Embeddings V2) |
-| Infrastructure | Docker Compose, Terraform, ECS Fargate, API Gateway, Cognito, RDS, S3, SQS, KMS |
-| Quality and security | pytest (unit, integration, real-model), ruff, mypy (strict), uv, GitHub Actions, gitleaks, pip-audit, Trivy |
+| Backend | Python 3.12, FastAPI, SQLAlchemy 2 (async), Alembic |
+| AI | LangChain, LangGraph, MCP; Ollama (Qwen3) locally, Amazon Bedrock in AWS |
+| Data | PostgreSQL 17, pgvector, full-text search |
+| Cloud | Terraform, ECS Fargate, API Gateway, Cognito, RDS, S3, SQS, KMS |
+| Quality | pytest, ruff, mypy (strict), GitHub Actions, Trivy, gitleaks |
 
 ## Run it locally
 
-Requirements: Docker, [uv](https://docs.astral.sh/uv/) and GNU Make. Models default to
-offline fakes, so no GPU or cloud account is needed.
+Needs Docker, [uv](https://docs.astral.sh/uv/) and GNU Make. It uses offline fake models
+by default, so no GPU or AWS account is needed.
 
 ```bash
-make setup                  # install dependencies and create .env
-make up migrate seed        # PostgreSQL + queue, schema, business data
-make data ingest            # generate the sample PDFs and index them
+make setup && make up migrate seed && make data ingest
 make ask q="How many days do I have to return a product?"
 make agent q="Can customer C-1006 return order SO-2026-0103?"
-make dev                    # full stack; API docs at http://localhost:8000/docs
-make check                  # lint, type check, unit tests
-make eval-security          # AI red-team suite against the agent
-make scan                   # gitleaks, pip-audit and Trivy, as in CI
+make check        # lint, type check, unit tests
 ```
 
-The API identifies callers with development headers by default. To use JWT
-authentication, set the `AUTH_*` values shown in `.env.example` and get a token with
-`make token role=supervisor user=sup-1`.
+`make help` lists everything else: real local models, JWT login, the red team, the
+security scans and the AWS deployment.
 
-Real local models (NVIDIA GPU, ~8 GB VRAM): run `make llm-pull`, then set
-`LLM_PROVIDER=ollama` and `EMBEDDING_PROVIDER=ollama` in `.env`. `make help` lists every
-command.
+## Where things are
 
-## Documentation
+| Path | Contents |
+| --- | --- |
+| `app/rag` | Chunking, hybrid retrieval, cited answers |
+| `app/agents` | LangGraph agent, approvals, MCP client |
+| `app/tools` | Business tools and their permissions |
+| `app/security` | Token verification, rate limits, token budgets |
+| `app/ingestion` | Upload, queue and worker |
+| `infra/terraform` | AWS environment |
+| `docs` | Architecture, threat model, decisions, benchmarks |
 
-- [Architecture](docs/architecture/ARCHITECTURE.md)
-- [Threat model and security roadmap](docs/security/THREAT_MODEL.md)
-- [Architecture decision records](docs/adr)
-- [RAG evaluation results](docs/benchmarks/2026-11-19-rag-local.md)
-- [Red-team and supply-chain results](docs/benchmarks/2026-11-22-red-team.md)
-- [AWS staging runbook](docs/operations/staging.md) and [verification](docs/benchmarks/2026-11-22-staging.md)
-- [Roadmap](docs/ROADMAP.md)
+**Docs:** [architecture](docs/architecture/ARCHITECTURE.md) ·
+[threat model](docs/security/THREAT_MODEL.md) · [decisions (ADRs)](docs/adr) ·
+benchmarks: [RAG](docs/benchmarks/2026-11-19-rag-local.md),
+[red team](docs/benchmarks/2026-11-22-red-team.md),
+[AWS](docs/benchmarks/2026-11-22-staging.md) ·
+[AWS runbook](docs/operations/staging.md) · [roadmap](docs/ROADMAP.md)
